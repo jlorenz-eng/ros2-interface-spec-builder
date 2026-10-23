@@ -1426,7 +1426,8 @@ function reviewBoard() {
     h("div", { class: "actions" },
       h("button", { class: "btn" + (rvEdit ? " primary" : ""), "aria-pressed": String(rvEdit), onclick: () => { rvEdit = !rvEdit; renderEditor(); } }, rvEdit ? "Done editing" : "Edit points"),
       h("button", { class: "btn", onclick: () => { rvImport = !rvImport; renderEditor(); } }, "Import"),
-      entries.length ? h("button", { class: "btn", onclick: () => saveFile(slug(P.title || "open_points") + "_answers.md", answersMarkdown(), "text/markdown") }, "Answers as Markdown") : null));
+      entries.length ? h("button", { class: "btn", onclick: () => saveFile(slug(P.title || "open_points") + "_answers.md", answersMarkdown(), "text/markdown") }, "Markdown") : null,
+      entries.length ? h("button", { class: "btn", onclick: answersPdf }, "PDF") : null));
   const settings = rvEdit ? h("div", { class: "card" }, h("h3", null, "Board"),
     h("div", { class: "grid" },
       labeled("Title", bound(P, "title", { ph: "Open points" })),
@@ -1501,6 +1502,37 @@ function answersHTML() {
     html += "</tbody></table>";
   });
   return html;
+}
+function answersPdf() {
+  if (!window.pdfMake) { toast("The PDF library did not load. Reload the page and try again."); return; }
+  const P = PT(); const c = rvCounts(); const B = t => ({ text: t, bold: true });
+  const plain = t => String(t ?? "").replace(/`([^`]+)`/g, "$1").replace(/\*\*(.+?)\*\*/g, "$1");
+  const STATUS = { open: ["Open", "#8a8f94"], discuss: ["In discussion", "#0d6584"], done: ["Decided", "#2b7a4b"] };
+  const content = [
+    { text: `${P.title || "Open points"} — Answers`, fontSize: 18, bold: true },
+    { text: `Status ${today()} · ${c.done} of ${c.total} done · ${c.discuss} in discussion` + (P.source ? ` · ${P.source}` : ""), fontSize: 9, color: "#555", margin: [0, 2, 0, 14] },
+  ];
+  P.sections.forEach(s => {
+    if (!s.items.length) return;
+    const cmp = s.items.some(i => i.mine || i.other);
+    const head = (cmp ? ["ID", "Point", s.mineLabel || "Your document", s.otherLabel || "Other document", "Status", "Decision / note"] : ["ID", "Point", "Status", "Decision / note"]).map(B);
+    const body = [head];
+    s.items.forEach(p => {
+      const st = stOf(p); const d = decisionText(p);
+      const point = { stack: [{ text: plain(p.title), bold: true },
+        p.ctx ? { text: plain(p.ctx), color: "#555", fontSize: 7.8, margin: [0, 2, 0, 0] } : "",
+        p.from.length ? { text: "Answer from: " + p.from.join(", "), color: "#777", fontSize: 7.5, margin: [0, 2, 0, 0] } : ""] };
+      const dec = d.kind === "done" ? (d.text ? plain(d.text) : "–") : d.kind === "prop" ? { text: "Proposal: " + plain(d.text), italics: true, color: "#444" } : { text: "–", color: "#999" };
+      const stCell = { text: STATUS[st][0], color: STATUS[st][1], bold: st !== "open" };
+      body.push(cmp ? [p.code, point, plain(p.mine), plain(p.other), stCell, dec] : [p.code, point, stCell, dec]);
+    });
+    content.push({ text: s.title + (s.sub ? ` · ${s.sub}` : ""), bold: true, fontSize: 12, margin: [0, 6, 0, 6] },
+      { table: { headerRows: 1, dontBreakRows: true, widths: cmp ? [34, "*", 70, 70, 52, "*"] : [34, "*", 58, "*"], body },
+        layout: lay(new Set([1])), fontSize: 8.6, margin: [0, 0, 0, 12] });
+  });
+  pdfMake.createPdf({ pageSize: "A4", pageMargins: [48, 52, 48, 52], defaultStyle: { fontSize: 9.5, lineHeight: 1.15 }, info: { title: (P.title || "Open points") + " — Answers" }, content,
+    footer: n => ({ text: String(n), alignment: "center", fontSize: 9, margin: [0, 20, 0, 0] }) })
+    .getBlob(b => saveFile(slug(P.title || "open_points") + "_answers.pdf", b, "application/pdf"));
 }
 function answersMarkdown() {
   const P = PT(); const c = rvCounts(); const q = s => String(s ?? "").replace(/\|/g, "\\|").replace(/\n+/g, "<br>");
