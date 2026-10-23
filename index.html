@@ -293,6 +293,12 @@ table.matrix input{accent-color:var(--accent);width:16px;height:16px}
 .result pre.code{white-space:pre-wrap}
 .presets{display:flex;gap:6px;flex-wrap:wrap}
 
+.rule-box{border:1px dashed var(--line-strong);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.rule-head,.rule-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px}
+.rule-head select,.rule-row select{width:auto}
+.rule-row input[type=text]{flex:0 1 auto;min-width:56px}
+.rule-text{font-family:var(--f-mono);font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+
 /* Responsive */
 @media (max-width:1180px){
   .tabs{display:inline-flex}
@@ -1541,6 +1547,7 @@ function minimalSafety() {
   };
 }
 function exampleSafety() {
+  const RT = (type, o) => Object.assign(defaultCond(type), o || {});
   const C = (id, name, desc) => ({ id, name, desc });
   const L = (id, name, action, needs, desc, clearable) => ({ id, name, action, needs, desc, clearable: !!clearable });
   const H = (key, cat, name, detect, source, level, o) => Object.assign({ id: uid(), key, cat, name, detect, source, level, on: "1", off: "3", escAfter: "", escTo: "", kills: [], why: "", status: "proposed" }, o || {});
@@ -1553,16 +1560,16 @@ function exampleSafety() {
       L("eland", "EMERGENCY_LAND", "fci/emergency_land", ["fci"], "Emergency landing, as fast as possible.")],
     authority: [{ id: uid(), name: "Pilot (RC)", self: false }, { id: uid(), name: "PX4 failsafe", self: false }, { id: uid(), name: "Safety", self: true }, { id: uid(), name: "Mission Control", self: false }],
     hazards: [
-      H("mc_lost", "Subsystems", "MC lost", "No heartbeat for > 2 s", "mission/heartbeat", "rtl", { why: "Flying still works, but nobody controls the mission." }),
-      H("nav_lost", "Subsystems", "Navigation lost", "No heartbeat for > 2 s", "navigation/heartbeat", "hold", { escAfter: "10", escTo: "rtl", why: "Possibly just a restart, so wait first." }),
-      H("fci_lost", "Subsystems", "FCI lost", "No status for > 1 s", "fci/vehicle_status", "land", { kills: ["fci"], why: "Safety can no longer act. PX4 takes over (offboard loss)." }),
+      H("mc_lost", "Subsystems", "MC lost", "No heartbeat for > 3 s", "mission/heartbeat", "rtl", { why: "Flying still works, but nobody controls the mission.", rule: RT("timeout", { topic: "mission/heartbeat", max_age_s: "3" }) }),
+      H("nav_lost", "Subsystems", "Navigation lost", "No heartbeat for > 3 s", "navigation/heartbeat", "hold", { escAfter: "10", escTo: "rtl", why: "Possibly just a restart, so wait first.", rule: RT("timeout", { topic: "navigation/heartbeat", max_age_s: "3" }) }),
+      H("fci_lost", "Subsystems", "FCI lost", "No status for > 1 s", "fci/vehicle_status", "land", { kills: ["fci"], why: "Safety can no longer act. PX4 takes over (offboard loss).", rule: RT("timeout", { topic: "fci/vehicle_status", max_age_s: "1" }) }),
       H("gcs_lost", "Communication", "GCS link lost", "Reported by MC", "–", "hold", { escAfter: "30", escTo: "rtl", status: "open", why: "To be decided: may the drone keep flying without an operator?" }),
-      H("bat_low", "Energy", "Battery low", "battery_percent < 30", "fci/vehicle_status", "rtl"),
-      H("bat_crit", "Energy", "Battery critical", "battery_percent < 15", "fci/vehicle_status", "land"),
+      H("bat_low", "Energy", "Battery low", "", "fci/vehicle_status", "rtl", { rule: RT("threshold", { signal: "battery_percent", dir: "below", enter: "30", clear: "35" }) }),
+      H("bat_crit", "Energy", "Battery critical", "", "fci/vehicle_status", "land", { rule: RT("any", { items: [RT("threshold", { signal: "battery_percent", dir: "below", enter: "15", clear: "18" }), RT("enum_at_least", { signal: "battery_warning", value: "WARNING_CRITICAL" })] }) }),
       H("bat_return", "Energy", "Battery insufficient for return", "Distance × consumption > remaining energy", "fci/vehicle_status, fci/position", "rtl", { kills: ["energy"], status: "open", why: "Advanced, for later." }),
-      H("gps_bad", "Position", "GPS degraded", "hdop > 2.5", "fci/vehicle_status", "hold"),
-      H("gps_lost", "Position", "GPS lost", "gps_fix_type < 3", "fci/vehicle_status", "hold", { kills: ["gps"], why: "Without GPS there is no hold and no RTL, so LAND results." }),
-      H("esc_hot", "Vehicle", "ESC overheating", "esc_temperature_max_c > 90", "fci/vehicle_status", "rtl", { status: "open", why: "Only if the ESCs provide telemetry." }),
+      H("gps_bad", "Position", "GPS degraded", "", "fci/vehicle_status", "hold", { rule: RT("threshold", { signal: "gps_hdop", dir: "above", enter: "2.5", clear: "1.5" }) }),
+      H("gps_lost", "Position", "GPS lost", "", "fci/vehicle_status", "hold", { kills: ["gps"], why: "Without GPS there is no hold and no RTL, so LAND results.", rule: RT("threshold", { signal: "gps_fix_type", dir: "below", enter: "3", clear: "" }) }),
+      H("esc_hot", "Vehicle", "ESC overheating", "", "fci/vehicle_status", "rtl", { status: "open", why: "Only if the ESCs provide telemetry.", rule: RT("threshold", { signal: "esc_temperature_max_c", dir: "above", enter: "90", clear: "80" }) }),
       H("geofence", "Environment", "Geofence violated", "Position outside the zone", "fci/position", "rtl", { status: "open", why: "If there is a geofence." }),
       H("wind", "Environment", "Strong wind", "PX4 wind estimate > limit", "–", "rtl", { status: "open" }),
       H("landing_zone", "Environment", "Landing zone occupied", "Sensor?", "–", "hold", { status: "open", why: "Depends on whether a downward-facing sensor is available." }),
@@ -1602,6 +1609,7 @@ function normalizeSafety(s) {
   if (!s.authority.some(a => a.self)) { const me = s.authority.find(a => /safety/i.test(a.name)); if (me) me.self = true; }
   s.hazards.forEach(x => {
     x.id ||= uid(); x.kills ||= []; x.status ||= "proposed";
+    x.key ??= ""; x.onMissing ||= "ignore"; x.rule = normRule(x.rule);
   });
   s.statusTopic ??= "";
   if (!Array.isArray(s.scenarios)) s.scenarios = [];
@@ -1640,9 +1648,140 @@ function safetyEditor() {
     h("div", null, h("div", { class: "crumb" }, "Concept · " + selfName()), h("h2", null, S.title || "Safety concept")),
     h("div", { class: "actions" },
       h("button", { class: "btn", onclick: () => saveFile(slug(S.title || "safety_concept") + ".md", safetyMarkdown(), "text/markdown") }, "Markdown"),
-      h("button", { class: "btn", onclick: safetyPdf }, "PDF")));
+      h("button", { class: "btn", onclick: safetyPdf }, "PDF"),
+      h("button", { class: "btn", title: "Configuration file for the safety supervisor", onclick: exportSafetyYaml }, "YAML config")));
   const body = safetyTab === "catalog" ? catalogTab() : safetyTab === "ladder" ? ladderTab() : simTab();
   return [head, h("div", { style: "margin-bottom:14px" }, tabs), ...body];
+}
+
+/* --- Machine-readable checks (exported as the supervisor's YAML configuration) --- */
+const RULE_TYPES = [["none", "No machine-readable check"], ["threshold", "Threshold"], ["flag", "Flag"], ["enum_at_least", "Enum at least"], ["timeout", "Timeout"], ["any", "Any of (OR)"], ["all", "All of (AND)"]];
+const SIMPLE_TYPES = RULE_TYPES.filter(([t]) => !["none", "any", "all"].includes(t));
+function defaultCond(type) {
+  const c = { id: uid(), type };
+  if (type === "threshold") Object.assign(c, { signal: "", dir: "below", enter: "", clear: "" });
+  if (type === "flag") Object.assign(c, { signal: "", equals: "false" });
+  if (type === "enum_at_least") Object.assign(c, { signal: "", value: "" });
+  if (type === "timeout") Object.assign(c, { topic: "", max_age_s: "" });
+  if (type === "any" || type === "all") c.items = [defaultCond("threshold")];
+  return c;
+}
+function normRule(r) {
+  if (!r || typeof r !== "object" || !RULE_TYPES.some(([t]) => t === r.type)) return { id: uid(), type: "none" };
+  r.id ||= uid();
+  if (r.type === "any" || r.type === "all") r.items = (Array.isArray(r.items) ? r.items : []).map(normRule).filter(c => SIMPLE_TYPES.some(([t]) => t === c.type));
+  return r;
+}
+function ruleText(r) {
+  if (!r || r.type === "none") return "";
+  const v = x => (x === "" || x == null) ? "?" : x;
+  switch (r.type) {
+    case "threshold": { const op = r.dir === "above" ? ">" : "<", cop = r.dir === "above" ? "<" : ">";
+      return `${v(r.signal)} ${op} ${v(r.enter)}` + (String(r.clear ?? "").trim() ? ` (clear ${cop} ${r.clear})` : ""); }
+    case "flag": return `${v(r.signal)} == ${v(r.equals)}`;
+    case "enum_at_least": return `${v(r.signal)} ≥ ${v(r.value)}`;
+    case "timeout": return `no ${v(r.topic)} for > ${v(r.max_age_s)} s`;
+    case "any": return (r.items || []).map(ruleText).filter(Boolean).join(" OR ");
+    case "all": return (r.items || []).map(ruleText).filter(Boolean).join(" AND ");
+  }
+  return "";
+}
+const detectText = x => (x.detect && x.detect.trim()) || ruleText(x.rule);
+const hazardKey = x => (x.key && x.key.trim()) || slug(x.name);
+const capKey = c => slug(c.name);
+function collectSignals(r, set) { if (!r) return; if (r.signal) set.add(r.signal); (r.items || []).forEach(c => collectSignals(c, set)); }
+function knownSignals() {
+  const set = new Set();
+  state.groups.forEach(g => g.items.forEach(it => Object.values(it.fields || {}).forEach(a => a.forEach(f => { const n = strip(f.name).trim(); if (n) set.add(n); }))));
+  SP().hazards.forEach(x => collectSignals(x.rule, set));
+  return [...set].sort();
+}
+function knownTopics() {
+  const set = new Set();
+  state.groups.forEach(g => g.items.forEach(it => { const n = strip(it.ros).trim(); if (it.kind === "topic" && n) set.add(n); }));
+  return [...set].sort();
+}
+function condFields(c) {
+  const sel = (key, opts) => selectEl(`rc-${c.id}-${key}`, opts, c[key], v => { c[key] = v; renderAll(); });
+  const inp = (key, ph, w, list) => { const e = bound(c, key, { ph, mono: true, list }); e.style.width = w; e.addEventListener("change", renderAll); return e; };
+  switch (c.type) {
+    case "threshold": return [inp("signal", "signal", "190px", "sig-list"), sel("dir", [["below", "below"], ["above", "above"]]), inp("enter", "value", "70px"), h("span", null, "clear at"), inp("clear", "value", "70px")];
+    case "flag": return [inp("signal", "signal", "190px", "sig-list"), h("span", null, "=="), sel("equals", [["false", "false"], ["true", "true"]])];
+    case "enum_at_least": return [inp("signal", "signal", "190px", "sig-list"), h("span", null, "≥"), inp("value", "ENUM_VALUE", "170px")];
+    case "timeout": return [h("span", null, "no"), inp("topic", "topic", "200px", "topic-list"), h("span", null, "for >"), inp("max_age_s", "s", "56px"), h("span", null, "s")];
+  }
+  return [];
+}
+function ruleEditor(x) {
+  x.rule = normRule(x.rule); const r = x.rule;
+  const typeSel = selectEl(`rt-${x.id}`, RULE_TYPES, r.type, v => { x.rule = v === "none" ? { id: uid(), type: "none" } : defaultCond(v); renderAll(); });
+  const rows = [];
+  if (r.type === "any" || r.type === "all") {
+    r.items.forEach((c, i) => rows.push(h("div", { class: "rule-row" },
+      selectEl(`rst-${c.id}`, SIMPLE_TYPES, c.type, v => { r.items[i] = defaultCond(v); renderAll(); }),
+      ...condFields(c),
+      armedBtn("icon del", ICON.del, "Remove condition (click twice)", () => { r.items.splice(i, 1); renderAll(); }))));
+    rows.push(h("div", null, h("button", { class: "btn ghost small", onclick: () => { r.items.push(defaultCond("threshold")); renderAll(); } }, "+ Condition")));
+  } else if (r.type !== "none") rows.push(h("div", { class: "rule-row" }, ...condFields(r)));
+  return h("div", { class: "f w4 rule-box" },
+    h("div", { class: "rule-head" }, h("span", { class: "hint", style: "font-weight:500" }, "Check"), typeSel,
+      r.type === "none" ? null : [h("span", { class: "hint" }, "· if data is missing:"),
+        selectEl(`miss-${x.id}`, [["ignore", "not active"], ["active", "active"]], x.onMissing || "ignore", v => { x.onMissing = v; renderAll(); })]),
+    ...rows,
+    r.type !== "none" ? h("div", { class: "rule-text" }, ruleText(r)) : null);
+}
+function yamlStr(v) {
+  v = String(v ?? "");
+  return /^[A-Za-z_][A-Za-z0-9_./-]*$/.test(v) && !/^(true|false|null|yes|no|on|off)$/i.test(v) ? v : JSON.stringify(v);
+}
+function yamlVal(v) {
+  const t = String(v ?? "").trim();
+  if (!t) return "null";
+  if (/^-?\d+(\.\d+)?$/.test(t)) return t;
+  if (/^(true|false)$/i.test(t)) return t.toLowerCase();
+  return yamlStr(t);
+}
+function ruleYaml(r, ind) {
+  const p = " ".repeat(ind); const out = [];
+  if (r.type === "any" || r.type === "all") {
+    out.push(`${p}${r.type}:`);
+    r.items.forEach(c => { const sub = ruleYaml(c, ind + 4); sub[0] = " ".repeat(ind + 2) + "- " + sub[0].trimStart(); out.push(...sub); });
+    return out;
+  }
+  out.push(`${p}type: ${r.type}`);
+  if (r.type === "threshold") {
+    out.push(`${p}signal: ${yamlStr(r.signal)}`, `${p}${r.dir === "above" ? "above" : "below"}: ${yamlVal(r.enter)}`);
+    if (String(r.clear ?? "").trim()) out.push(`${p}${r.dir === "above" ? "clear_below" : "clear_above"}: ${yamlVal(r.clear)}`);
+  }
+  if (r.type === "flag") out.push(`${p}signal: ${yamlStr(r.signal)}`, `${p}equals: ${yamlVal(r.equals)}`);
+  if (r.type === "enum_at_least") out.push(`${p}signal: ${yamlStr(r.signal)}`, `${p}value: ${yamlStr(r.value)}`);
+  if (r.type === "timeout") out.push(`${p}topic: ${yamlStr(r.topic)}`, `${p}max_age_s: ${yamlVal(r.max_age_s)}`);
+  return out;
+}
+function safetyYaml() {
+  const S = SP(); const lvName = id => S.levels[lvIdx(id)].name; const capOf = id => { const c = S.caps.find(z => z.id === id); return c ? capKey(c) : id; };
+  const y = [`# Safety supervisor configuration, generated by the Interface Spec Builder`, `# from "${S.title || "Safety concept"}" on ${today()}. Edit the concept in the builder, not this file.`, ""];
+  y.push("levels:            # from lowest to highest");
+  S.levels.forEach(l => y.push(`  - name: ${yamlStr(l.name)}`, `    action: ${l.action ? yamlStr(l.action) : "null"}`, `    requires: [${l.needs.map(capOf).join(", ")}]`, `    may_end: ${l.clearable ? "true" : "false"}`));
+  y.push("", "capabilities:");
+  S.caps.forEach(c => y.push(`  - key: ${capKey(c)}`, `    name: ${JSON.stringify(c.name)}`));
+  y.push("", "authorities:       # highest precedence first");
+  S.authority.forEach(a => y.push(`  - name: ${JSON.stringify(a.name)}`, `    self: ${a.self ? "true" : "false"}`));
+  y.push("", "hazards:");
+  S.hazards.forEach(x => {
+    y.push(`  - key: ${hazardKey(x)}`, `    name: ${JSON.stringify(x.name)}`, `    category: ${JSON.stringify(catOf(x))}`, `    level: ${lvName(x.level)}`, `    status: ${x.status}`);
+    if (x.rule && x.rule.type !== "none") { y.push("    detect:", ...ruleYaml(x.rule, 6), `    on_missing: ${x.onMissing || "ignore"}`); }
+    else y.push("    detect: null      # no machine-readable check yet");
+    y.push(`    onset_s: ${yamlVal(x.on)}`, `    clear_s: ${yamlVal(x.off)}`);
+    if (x.escTo) y.push("    escalate:", `      after_s: ${yamlVal(x.escAfter)}`, `      to: ${lvName(x.escTo)}`);
+    if (x.kills.length) y.push(`    disables: [${x.kills.map(capOf).join(", ")}]`);
+  });
+  return y.join("\n") + "\n";
+}
+function exportSafetyYaml() {
+  const missing = SP().hazards.filter(x => !x.rule || x.rule.type === "none").length;
+  saveFile(slug(SP().title || "safety_concept") + "_config.yaml", safetyYaml(), "text/yaml");
+  if (missing) setTimeout(() => toast(`${missing} hazard(s) have no machine-readable check yet (detect: null).`), 1200);
 }
 
 /* --- Tab: hazard catalogue --- */
@@ -1663,11 +1802,13 @@ function catalogTab() {
     out.push(h("div", { style: "margin:-2px 0 6px" }, h("button", { class: "btn ghost small", onclick: () => addHazard(cat === "Uncategorized" ? "" : cat) }, `+ Hazard in “${cat}”`)));
   });
   if (S.hazards.length) out.push(h("div", { class: "danger-zone", style: "margin-top:14px" }, h("button", { class: "btn", onclick: () => addHazard("New category") }, "+ New category")));
-  out.push(h("datalist", { id: "hz-cats" }, cats.map(c => h("option", { value: c }))));
+  out.push(h("datalist", { id: "hz-cats" }, cats.map(c => h("option", { value: c }))),
+    h("datalist", { id: "sig-list" }, knownSignals().map(c => h("option", { value: c }))),
+    h("datalist", { id: "topic-list" }, knownTopics().map(c => h("option", { value: c }))));
   return out;
 }
 function addHazard(cat) {
-  const x = { id: uid(), cat, name: "New hazard", detect: "", source: "", level: SP().levels[Math.min(1, SP().levels.length - 1)].id, on: "1", off: "3", escAfter: "", escTo: "", kills: [], why: "", status: "proposed" };
+  const x = { id: uid(), key: "", cat, name: "New hazard", detect: "", source: "", rule: { id: uid(), type: "none" }, onMissing: "ignore", level: SP().levels[Math.min(1, SP().levels.length - 1)].id, on: "1", off: "3", escAfter: "", escTo: "", kills: [], why: "", status: "proposed" };
   SP().hazards.push(x); renderAll();
   requestAnimationFrame(() => { const el = document.getElementById(`in-${x.id}-name`); if (el) { el.scrollIntoView({ block: "center" }); el.focus(); el.select(); } });
 }
@@ -1683,8 +1824,10 @@ function hazardCard(x) {
       h("button", { class: "icon", title: "Move down", html: ICON.down, onclick: () => move(arr, k, 1) }),
       armedBtn("icon del", ICON.del, "Delete hazard (click twice)", () => { arr.splice(k, 1); sim.active.delete(x.id); renderAll(); })),
     h("div", { class: "hz-grid" },
-      labeled("Detection", bound(x, "detect", { ph: "e.g. value < threshold" }), "w2"),
+      labeled("Description of the detection", bound(x, "detect", { ph: ruleText(x.rule) || "e.g. battery below 30 %" }), "w2"),
       labeled("Source", bound(x, "source", { ph: "topic / signal", mono: true }), "w2"),
+      ruleEditor(x),
+      labeled("Key (ID in the YAML config)", bound(x, "key", { ph: slug(x.name), mono: true }), "w2"),
       labeled("Onset time (s)", bound(x, "on", { ph: "1", mono: true })),
       labeled("Clear time (s)", bound(x, "off", { ph: "3", mono: true })),
       h("div", { class: "f w2" }, h("span", { class: "hint", style: "font-weight:500" }, "Escalation"),
@@ -1903,7 +2046,7 @@ function safetyHTML() {
       const esc2 = x.escTo ? `after ${esc(x.escAfter || "?")} s → ${esc(S.levels[lvIdx(x.escTo)].name)}` : "–";
       const kills = x.kills.length ? `<br><i>makes impossible: ${x.kills.map(c => esc(capName(c))).join(", ")}</i>` : "";
       const why = x.why ? `<br><span style="color:#666">${esc(x.why)}</span>` : "";
-      html += `<tr><td>${esc(x.name)}${why}</td><td>${esc(x.detect)}${x.source ? `<br><code>${esc(x.source)}</code>` : ""}<br><span style="color:#666">onset ${esc(x.on || "0")} s · clear ${esc(x.off || "0")} s</span>${kills}</td><td>${esc(S.levels[lvIdx(x.level)].name)}</td><td>${esc2}</td><td>${x.status === "open" ? '<span class="red">Open</span>' : esc(st[x.status] || x.status)}</td></tr>`;
+      html += `<tr><td>${esc(x.name)}${why}</td><td>${esc(detectText(x))}${x.detect && ruleText(x.rule) ? `<br><code>${esc(ruleText(x.rule))}</code>` : ""}${x.source ? `<br><code>${esc(x.source)}</code>` : ""}<br><span style="color:#666">onset ${esc(x.on || "0")} s · clear ${esc(x.off || "0")} s</span>${kills}</td><td>${esc(S.levels[lvIdx(x.level)].name)}</td><td>${esc2}</td><td>${x.status === "open" ? '<span class="red">Open</span>' : esc(st[x.status] || x.status)}</td></tr>`;
     });
     html += "</tbody></table>";
   });
@@ -1919,8 +2062,8 @@ function safetyMarkdown() {
   S.caps.forEach(c => md.push(`| ${p(c.name)} | ${p(c.desc)} |`));
   md.push("", "## 4 Hazard catalogue", "");
   [...new Set(S.hazards.map(catOf))].forEach(cat => {
-    md.push(`### ${cat}`, "", "| Hazard | Detection | Source | Onset / clear (s) | Level | Escalation | Makes impossible | Status | Rationale |", "|---|---|---|---|---|---|---|---|---|");
-    S.hazards.filter(x => catOf(x) === cat).forEach(x => md.push(`| ${p(x.name)} | ${p(x.detect)} | ${x.source ? "`" + x.source + "`" : ""} | ${p(x.on)} / ${p(x.off)} | ${S.levels[lvIdx(x.level)].name} | ${x.escTo ? `after ${p(x.escAfter)} s → ${S.levels[lvIdx(x.escTo)].name}` : "–"} | ${p(x.kills.map(capName).join(", "))} | ${st[x.status] || x.status} | ${p(x.why)} |`));
+    md.push(`### ${cat}`, "", "| Hazard | Detection | Check | Source | Onset / clear (s) | Level | Escalation | Makes impossible | Status | Rationale |", "|---|---|---|---|---|---|---|---|---|---|");
+    S.hazards.filter(x => catOf(x) === cat).forEach(x => md.push(`| ${p(x.name)} | ${p(detectText(x))} | ${ruleText(x.rule) ? "`" + p(ruleText(x.rule)) + "`" : ""} | ${x.source ? "`" + x.source + "`" : ""} | ${p(x.on)} / ${p(x.off)} | ${S.levels[lvIdx(x.level)].name} | ${x.escTo ? `after ${p(x.escAfter)} s → ${S.levels[lvIdx(x.escTo)].name}` : "–"} | ${p(x.kills.map(capName).join(", "))} | ${st[x.status] || x.status} | ${p(x.why)} |`));
     md.push("");
   });
   return md.join("\n");
@@ -1942,7 +2085,7 @@ function safetyPdf() {
     const body = [["Hazard", "Detection", "Level", "Escalation", "Status"].map(H)];
     S.hazards.filter(x => catOf(x) === cat).forEach(x => body.push([
       { stack: [x.name, x.why ? { text: x.why, color: "#666", fontSize: 7.5 } : ""] },
-      { stack: [x.detect || "", x.source ? { text: x.source, color: "#444", fontSize: 7.5 } : "", { text: `onset ${x.on || 0} s · clear ${x.off || 0} s`, color: "#666", fontSize: 7.5 },
+      { stack: [detectText(x), x.detect && ruleText(x.rule) ? { text: ruleText(x.rule), color: "#444", fontSize: 7.5 } : "", x.source ? { text: x.source, color: "#444", fontSize: 7.5 } : "", { text: `onset ${x.on || 0} s · clear ${x.off || 0} s`, color: "#666", fontSize: 7.5 },
         x.kills.length ? { text: "makes impossible: " + x.kills.map(capName).join(", "), italics: true, fontSize: 7.5 } : ""] },
       S.levels[lvIdx(x.level)].name,
       x.escTo ? `after ${x.escAfter || "?"} s → ${S.levels[lvIdx(x.escTo)].name}` : "–",
