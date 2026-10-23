@@ -1,33 +1,31 @@
 # ROS 2 Interface Spec Builder
 
-A lightweight, browser-based tool for creating and documenting ROS 2 interface specifications.
+A lightweight, browser-based tool for creating and documenting ROS 2 interface specifications, tracking design decisions, and exploring safety concepts.
 
-Built to simplify the documentation of topics, services, and actions during robotics development.
+**[Try it online](https://jlorenz-eng.github.io/ros2-interface-spec-builder/)**
 
-### Features
+## Features
 
-- Define ROS 2 topics, services, and actions
-- Document fields, data types, and enums
-- Track open questions and design decisions
-- Model safety concepts and simulate responses
-- Live document preview
-- Export to PDF, Markdown, and JSON
-- Local browser storage, no backend required
+- **Interface specifications:** Define ROS 2 topics, services, and actions, including fields, data types, and enums.
+- **Review board:** Track open questions, design decisions, and responsibilities.
+- **Safety concepts:** Define hazards, safety levels, and escalation rules with an interactive simulator.
+- **Live preview:** See the generated documentation while editing.
+- **Export:** Generate PDF and Markdown documents or save entire projects as JSON.
+- **Import:** Load existing projects or merge selected parts of multiple projects.
+- **Local storage:** No backend or installation required.
 
-### Usage
+## Usage
 
-**[Open the Spec Builder](https://jlorenz-eng.github.io/ros2-interface-spec-builder/)**
+Open the [web app](https://jlorenz-eng.github.io/ros2-interface-spec-builder/) or download `index.html` and open it in your browser.
 
-Alternatively, download `index.html` and open it in your browser.
+Changes are automatically saved in your browser. Export your project as JSON to back it up or continue working on another device.
 
-Projects are stored locally in your browser and can be exported as JSON for later editing.
+## Notes
 
-### Notes
+This is an experimental tool created with AI assistance for personal use in ROS 2 development. It is provided as-is and may contain bugs.
 
-This is a small experimental tool built with AI assistance for personal use in ROS 2 development. It is provided as-is and may contain bugs.
+The safety simulator is intended for conceptual exploration and does not replace formal safety analysis or validation.
 
-The safety simulation is intended for conceptual exploration, not for validating safety-critical systems.
-
-### License
+## License
 
 MIT
