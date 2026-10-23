@@ -1,0 +1,1971 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Interface Spec Builder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: tool-like three-column grid — navigation | form | paper preview; narrow: tabs */
+:root{
+  --bg:#e9edf0; --surface:#ffffff; --surface-2:#f4f6f8; --line:#d3dade; --line-strong:#b5c0c7;
+  --fg:#16212a; --muted:#5a6976; --accent:#0d6584; --accent-ink:#ffffff; --accent-soft:#d9ebf2;
+  --red:#c42a1f; --topic:#2b7a4b; --service:#8d5a0b; --action:#5a4db0;
+  --st-open:#b26a00; --st-discuss:#0d6584; --st-done:#2b7a4b;
+  --paper:#ffffff; --ink:#151515; --paper-line:#8e959b; --paper-red:#d0021b; --shadow:0 1px 2px rgba(20,35,45,.08),0 6px 24px rgba(20,35,45,.08);
+  --f-ui:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-cond:'IBM Plex Sans Condensed','IBM Plex Sans',system-ui,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --f-paper:Roboto,'Helvetica Neue',Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1418; --surface:#151d23; --surface-2:#1b252c; --line:#2a3740; --line-strong:#3a4954;
+  --fg:#e2e9ee; --muted:#93a3ae; --accent:#55b6d8; --accent-ink:#05212b; --accent-soft:#163542;
+  --red:#ff6f62; --topic:#72cf98; --service:#e2b45d; --action:#aa9df6;
+  --st-open:#e7a54a; --st-discuss:#55b6d8; --st-done:#72cf98;
+  --paper:#f1f1ee; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 28px rgba(0,0,0,.35); color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0e1418; --surface:#151d23; --surface-2:#1b252c; --line:#2a3740; --line-strong:#3a4954;
+  --fg:#e2e9ee; --muted:#93a3ae; --accent:#55b6d8; --accent-ink:#05212b; --accent-soft:#163542;
+  --red:#ff6f62; --topic:#72cf98; --service:#e2b45d; --action:#aa9df6;
+  --st-open:#e7a54a; --st-discuss:#55b6d8; --st-done:#72cf98;
+  --paper:#f1f1ee; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 28px rgba(0,0,0,.35); color-scheme:dark }
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:14px;line-height:1.45;display:flex;flex-direction:column}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+/* Top bar */
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:var(--surface);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0;margin-right:auto}
+.brand b{font-family:var(--f-cond);font-weight:600;font-size:17px;letter-spacing:.01em}
+.brand span{color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-strong);background:var(--surface);
+  padding:6px 11px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:500}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--fg);background:var(--surface-2)}
+.btn.small{padding:3px 8px;font-size:12.5px}
+.btn.danger{color:var(--red)}
+.btn.armed{background:var(--red);color:#fff;border-color:var(--red)}
+.btn svg{width:14px;height:14px}
+.tabs{display:none;gap:2px;background:var(--surface-2);border:1px solid var(--line);border-radius:7px;padding:2px}
+.tabs button{border:0;background:transparent;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:13px}
+.tabs button[aria-pressed="true"]{background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.12);font-weight:500}
+
+/* Main grid */
+.app{flex:1;min-height:0;display:grid;grid-template-columns:250px minmax(0,1fr) minmax(0,1.05fr)}
+.pane{min-height:0;overflow:auto}
+.nav{background:var(--surface);border-right:1px solid var(--line);padding:12px 10px 24px;
+  padding-left:max(10px,env(safe-area-inset-left,0px))}
+.editor{padding:20px 22px 60px}
+.preview{background:var(--bg);border-left:1px solid var(--line);padding:22px 22px 60px;
+  padding-right:max(22px,env(safe-area-inset-right,0px))}
+
+/* Navigation */
+.nav h4{font-family:var(--f-cond);font-weight:600;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:14px 6px 6px}
+.nav-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:transparent;padding:6px 8px;border-radius:6px;cursor:pointer;min-width:0}
+.nav-item:hover{background:var(--surface-2)}
+.nav-item[aria-current="true"]{background:var(--accent-soft)}
+.nav-item .t{min-width:0;display:flex;flex-direction:column}
+.nav-item .t b{font-weight:500;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-item .t small{font-family:var(--f-mono);font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.group-row{display:flex;align-items:center;gap:2px;margin-top:10px}
+.group-row .nav-item{font-family:var(--f-cond);font-weight:600;font-size:13.5px}
+.group-row .nav-item .num{color:var(--muted);font-family:var(--f-mono);font-size:12px;font-weight:400}
+.nav-list{display:flex;flex-direction:column;gap:1px;padding-left:8px;border-left:1px solid var(--line);margin-left:12px}
+.add-row{display:flex;gap:6px;padding:4px 8px}
+.kind{flex:none;font-family:var(--f-mono);font-size:10px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;
+  border:1px solid currentColor;border-radius:4px;padding:0 4px;line-height:16px;width:24px;text-align:center}
+.kind.topic{color:var(--topic)} .kind.service{color:var(--service)} .kind.action{color:var(--action)}
+
+/* Editor */
+.ed-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.ed-head h2{font-family:var(--f-cond);font-weight:600;font-size:22px;margin:0;text-wrap:balance;line-height:1.15}
+.ed-head .crumb{font-size:12px;color:var(--muted);margin-bottom:2px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px 16px;margin-bottom:14px}
+.card > h3{display:flex;align-items:center;gap:10px;font-family:var(--f-cond);font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+.card > h3 .sp{flex:1}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+.grid .full{grid-column:1/-1}
+label.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+label.f > span{font-size:12px;color:var(--muted);font-weight:500}
+input[type=text],textarea,select{width:100%;box-sizing:border-box;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
+textarea{resize:vertical;line-height:1.4}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);background:var(--surface);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.mono{font-family:var(--f-mono);font-size:12.5px}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:7px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:5px 12px;cursor:pointer;font-size:13px;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:500}
+.hint{font-size:12px;color:var(--muted)}
+.hint code{font-family:var(--f-mono);background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+
+/* Row tables in the editor */
+.block{border:1px solid var(--line);border-radius:8px;margin-top:10px;overflow:hidden}
+.block-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.block-h b{font-family:var(--f-cond);font-weight:600;font-size:14px;margin-right:auto}
+.rows{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.85fr) minmax(0,1.5fr) auto;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line);align-items:start}
+.row.enum{grid-template-columns:minmax(0,1.2fr) 64px minmax(0,1.5fr) auto}
+.row.enum.novals{grid-template-columns:minmax(0,1fr) minmax(0,1.5fr) auto}
+.row:last-child{border-bottom:0}
+.row.head{background:transparent;font-size:11px;color:var(--muted);font-weight:500;letter-spacing:.03em;text-transform:uppercase;padding-block:5px}
+.row textarea{min-height:32px;height:32px;resize:none;overflow:hidden}
+.row input,.row textarea{padding:5px 7px}
+.row-tools{display:flex;gap:0}
+.icon{border:0;background:transparent;width:26px;height:30px;display:grid;place-items:center;border-radius:5px;cursor:pointer;color:var(--muted)}
+.icon:hover{background:var(--surface-2);color:var(--fg)}
+.icon.del:hover{color:var(--red)}
+.icon.armed{background:var(--red);color:#fff}
+.icon svg{width:14px;height:14px}
+.empty{padding:12px;color:var(--muted);font-size:12.5px}
+.foot{display:flex;gap:6px;flex-wrap:wrap;padding:8px 10px;border-top:1px solid var(--line);background:var(--surface)}
+.enum-title{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
+.enum-title span{font-family:var(--f-cond);font-weight:600;white-space:nowrap}
+.enum-title input{max-width:240px}
+.check{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer}
+.check input{accent-color:var(--accent);width:15px;height:15px}
+.opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px}
+.opts .check{color:var(--fg);font-size:13px}
+.note-row{display:flex;gap:6px;align-items:start;margin-bottom:6px}
+.danger-zone{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* Paper preview */
+.paper{background:var(--paper);color:var(--ink);font-family:var(--f-paper);max-width:640px;margin:0 auto;box-shadow:var(--shadow);
+  padding:44px 48px 56px;font-size:12.5px;line-height:1.38;border-radius:2px}
+.paper .ttl{font-weight:700;font-size:14px;margin:0}
+.paper .ros{font-weight:700;font-size:13.5px;margin:2px 0 12px}
+.paper .meta{margin:0 0 12px}
+.paper .meta div{margin:0}
+.paper table{border-collapse:collapse;width:100%;margin:0 0 14px;table-layout:fixed;color:var(--ink);font-size:inherit;line-height:inherit}
+.paper td,.paper th{border:.5px solid var(--paper-line);padding:3px 6px;text-align:left;vertical-align:top;font-weight:400;overflow-wrap:anywhere}
+.paper tr.hd th,.paper tr.blk td{font-weight:700}
+.paper tr.thick td,.paper tr.thick th{border-bottom:1.5px solid var(--paper-line)}
+.paper table.en{font-size:11px}
+.paper table.en td.v{width:18px;text-align:center}
+.paper .red{color:var(--paper-red);font-weight:700}
+.paper .note{font-style:italic;margin:0 0 12px}
+.paper .note b{color:var(--paper-red)}
+.paper p{margin:0 0 8px}
+.paper h1{font-size:22px;margin:0 0 4px;font-weight:700}
+.paper h2{font-size:16px;margin:0 0 14px;font-weight:700}
+.paper .sub{font-size:14px;margin:0 0 4px}
+.paper .small{color:#555;font-size:11.5px;margin:0 0 18px}
+.paper .notes{border:.5px solid var(--paper-line);padding:10px 14px;margin:0 0 20px}
+.paper .notes b{display:block;margin-bottom:4px}
+.paper .notes ul{margin:0;padding-left:18px}
+.paper .toc div{display:flex;gap:8px;margin:2px 0}
+.paper .toc div.sub{padding-left:16px}
+.paper .toc span.d{flex:1;border-bottom:1px dotted #aaa;transform:translateY(-4px)}
+.pv-caption{max-width:640px;margin:0 auto 10px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.pv-caption .pill{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line-strong);border-radius:20px;padding:1px 8px}
+
+/* ROS definition box */
+pre.code{font-family:var(--f-mono);font-size:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0;overflow-x:auto;white-space:pre;line-height:1.5}
+
+/* Toast */
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);
+  padding:9px 14px;border-radius:8px;font-size:13px;box-shadow:var(--shadow);z-index:50;max-width:min(90vw,520px)}
+
+/* Open points (review board) */
+.rv-ring{flex:none;display:grid;place-items:center}
+.rv-ring circle{fill:none;stroke-width:3.4}
+.rv-ring .r-bg{stroke:var(--line)} .rv-ring .r-done{stroke:var(--st-done)} .rv-ring .r-dis{stroke:var(--st-discuss)}
+.rv-hero{display:flex;gap:18px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.rv-hero .rv-ring circle{stroke-width:7}
+.rv-big{display:flex;flex-direction:column;gap:2px;min-width:0}
+.rv-big b{font-family:var(--f-cond);font-weight:600;font-size:30px;line-height:1;font-variant-numeric:tabular-nums}
+.rv-big span{color:var(--muted);font-size:12.5px}
+.rv-side{flex:1;min-width:220px;display:flex;flex-direction:column;gap:8px}
+.meter{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--surface-2);border:1px solid var(--line)}
+.meter span{display:block;height:100%}
+.meter .m-done{background:var(--st-done)} .meter .m-discuss{background:var(--st-discuss)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.sdot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--st-open);display:inline-block}
+[data-st="discuss"] > .sdot,.sdot.discuss{background:var(--st-discuss)}
+[data-st="done"] > .sdot,.sdot.done{background:var(--st-done)}
+.callout{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px}
+.callout b{font-weight:600}
+.teams{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted)}
+.team-btn{border:1px solid var(--line-strong);background:var(--surface);border-radius:20px;padding:2px 10px;cursor:pointer;font-size:12.5px;font-variant-numeric:tabular-nums}
+.team-btn:hover{border-color:var(--accent)}
+.team-btn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 6px}
+.toolbar input{flex:1;min-width:160px;max-width:260px}
+.toolbar .sp{flex:1}
+.rv-sec{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-family:var(--f-cond);font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:20px 0 8px}
+.rv-sec .c{font-family:var(--f-mono);letter-spacing:0;font-weight:400;text-transform:none}
+.rv-part{font-family:var(--f-cond);font-weight:600;font-size:17px;margin:26px 0 0;padding-top:12px;border-top:1px solid var(--line-strong)}
+.rv-part:first-child{margin-top:8px;border-top:0;padding-top:0}
+.qc{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--st-open);border-radius:8px;padding:12px 14px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.qc[data-st="discuss"]{border-left-color:var(--st-discuss)}
+.qc[data-st="done"]{border-left-color:var(--st-done)}
+.qc[data-st="done"] .qq,.qc[data-st="done"] .qctx{color:var(--muted)}
+.qc[data-st="done"] .qq{text-decoration:line-through;text-decoration-thickness:1px;text-decoration-color:var(--line-strong)}
+.qc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 5px var(--accent-soft)}100%{box-shadow:0 0 0 0 transparent}}
+.qc-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.qid{font-family:var(--f-mono);font-weight:500;font-size:12.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:0 6px;line-height:20px;white-space:nowrap}
+.chip{font-size:11.5px;border:1px solid var(--line);border-radius:20px;padding:0 8px;line-height:18px;color:var(--muted);white-space:nowrap}
+.chip.me{border-color:var(--accent);color:var(--accent)}
+.chip.block{background:var(--red);border-color:var(--red);color:var(--surface);font-weight:500}
+.chip.ghost{border-style:dashed}
+.tick{margin-left:auto;flex:none;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line-strong);background:var(--surface);display:grid;place-items:center;cursor:pointer;color:transparent}
+.tick svg{width:16px;height:16px}
+.tick:hover{border-color:var(--st-done);color:var(--st-done)}
+.tick[aria-pressed="true"]{background:var(--st-done);border-color:var(--st-done);color:var(--surface)}
+.qq{margin:0;font-size:14.5px;font-weight:600;line-height:1.35;text-wrap:pretty}
+.qctx{margin:0;color:var(--muted);font-size:13px;max-width:70ch}
+.qc code,.rel-row code{font-family:var(--f-mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:0 3px;color:var(--fg)}
+.qc .cmp b{color:var(--red);font-weight:600}
+.qlinks{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted)}
+.link-chip{display:inline-flex;gap:5px;align-items:center;border:1px solid var(--line-strong);background:var(--surface);border-radius:5px;padding:1px 7px;cursor:pointer;font-size:12px;color:var(--fg)}
+.link-chip:hover{border-color:var(--accent);color:var(--accent)}
+.link-chip .kind{width:auto;padding:0 3px;line-height:14px}
+.qwork{display:flex;flex-direction:column;gap:8px;border-top:1px dashed var(--line);padding-top:10px}
+.qwork .seg button{padding:3px 10px;font-size:12.5px}
+.cmp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border:1px solid var(--line);border-radius:6px;overflow:hidden;font-size:13px}
+.cmp > div{padding:6px 9px;min-width:0;overflow-wrap:anywhere}
+.cmp .ch{background:var(--surface-2);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:500;padding-block:4px}
+.cmp .mine{border-right:1px solid var(--line)}
+.rv-empty{padding:24px;text-align:center;color:var(--muted);border:1px dashed var(--line-strong);border-radius:8px;margin-top:12px}
+.rel-list{display:flex;flex-direction:column;gap:2px}
+.rel-row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:transparent;border-radius:6px;padding:5px 6px;cursor:pointer;min-width:0}
+.rel-row:hover{background:var(--surface-2)}
+.rel-row .rel-t{min-width:0;flex:1;font-size:13px}
+.rel-row[data-st="done"] .rel-t{color:var(--muted);text-decoration:line-through}
+.rel-row .go{color:var(--muted);font-size:12px;white-space:nowrap}
+.paper code{font-family:var(--f-mono);font-size:10.5px}
+.paper .open{color:#999}
+.paper .prop{font-style:italic;color:#444}
+
+/* Safety-Konzept */
+.hz{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--lv,var(--line-strong));border-radius:8px;padding:10px 12px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.hz-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hz-top .hz-name{flex:1;min-width:120px;font-weight:600}
+.hz-top .hz-cat{width:130px;flex:none}
+.hz-top select{width:auto}
+.hz-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px}
+.hz-grid .w2{grid-column:span 2} .hz-grid .w4{grid-column:1/-1}
+.lv{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:11.5px;font-weight:500;border-radius:20px;padding:1px 9px;border:1px solid var(--lv);color:var(--lv);white-space:nowrap;line-height:18px}
+.lv.solid{background:var(--lv);color:var(--surface)}
+.caps{display:flex;gap:6px 14px;flex-wrap:wrap}
+.esc-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px}
+.esc-row input{width:64px}
+.esc-row select{width:auto}
+.ladder{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ladder .arrow{color:var(--muted)}
+.lv-row{display:grid;grid-template-columns:28px minmax(0,.9fr) minmax(0,1fr) minmax(0,1.6fr) auto auto;gap:6px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--line)}
+.lv-row:last-child{border-bottom:0}
+.lv-num{font-family:var(--f-mono);font-size:12px;color:var(--muted);text-align:center}
+.matrix-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table.matrix{border-collapse:collapse;font-size:13px;width:100%}
+table.matrix th,table.matrix td{border-bottom:1px solid var(--line);padding:6px 10px;text-align:center;white-space:nowrap}
+table.matrix tr:last-child td{border-bottom:0}
+table.matrix th:first-child,table.matrix td:first-child{text-align:left}
+table.matrix th{background:var(--surface-2);font-weight:500;font-size:12px;color:var(--muted)}
+table.matrix input{accent-color:var(--accent);width:16px;height:16px}
+.auth{display:flex;flex-direction:column;gap:4px}
+.auth-row{display:flex;gap:6px;align-items:center}
+.auth-row .lv-num{width:22px}
+.rules{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:13px}
+.sim{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+.sim-list{display:flex;flex-direction:column;gap:3px}
+.sim-cat{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:10px 0 2px}
+.sim-list .check{color:var(--fg);font-size:13px}
+.sim-list .check .lv{margin-left:auto}
+.sim-list label.check{display:flex;width:100%}
+.result{border:1px solid var(--line);border-left:4px solid var(--lv);border-radius:10px;padding:14px;background:var(--surface);display:flex;flex-direction:column;gap:10px;position:sticky;top:0}
+.result .big{font-family:var(--f-cond);font-size:28px;font-weight:600;color:var(--lv);line-height:1.1}
+.result .decision{font-weight:600;font-size:14px}
+.result ol{margin:0;padding-left:18px;font-size:13px;display:flex;flex-direction:column;gap:3px;color:var(--muted)}
+.result ol li.warn{color:var(--fg)}
+.result pre.code{white-space:pre-wrap}
+.presets{display:flex;gap:6px;flex-wrap:wrap}
+
+/* Responsive */
+@media (max-width:1180px){
+  .tabs{display:inline-flex}
+  .app{grid-template-columns:230px minmax(0,1fr)}
+  .app[data-view="edit"] .preview{display:none}
+  .app[data-view="preview"] .editor{display:none}
+  .preview{border-left:0}
+}
+@media (max-width:760px){
+  .hz-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .sim{grid-template-columns:minmax(0,1fr)}
+  .result{position:static}
+  .lv-row{grid-template-columns:24px minmax(0,1fr) auto auto}
+  .lv-row > :nth-child(3),.lv-row > :nth-child(4){grid-column:2/-1}
+  html,body{height:auto}
+  .app{display:block}
+  .pane{overflow:visible}
+  .nav{border-right:0;border-bottom:1px solid var(--line);max-height:42vh;overflow:auto;padding-right:max(10px,env(safe-area-inset-right,0px))}
+  .editor,.preview{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .grid,.opts{grid-template-columns:minmax(0,1fr)}
+  .row,.row.enum,.row.enum.novals{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}
+  .row > :nth-child(3){grid-column:1/3}
+  .row.enum.novals > :nth-child(2){grid-column:auto}
+  .row.head{display:none}
+  .paper{padding:26px 20px 36px}
+  .brand span{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><b>Interface Spec Builder</b><span id="docName"></span></div>
+  <div class="tabs" role="group" aria-label="View">
+    <button id="tabEdit" aria-pressed="true">Edit</button>
+    <button id="tabPrev" aria-pressed="false">Preview</button>
+  </div>
+  <div class="actions">
+    <button class="btn ghost" id="btnImport" title="Open a JSON project. Replaces the current project.">Open</button>
+    <input type="file" id="fileIn" accept=".json,application/json" hidden>
+    <button class="btn" id="btnJson" title="Save the project as JSON to keep editing it later">JSON</button>
+    <button class="btn" id="btnMd">Markdown</button>
+    <button class="btn primary" id="btnPdf">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2v8m0 0 3-3m-3 3L5 7M3 12.5h10"/></svg>Create PDF</button>
+  </div>
+</header>
+
+<main class="app" id="app" data-view="edit">
+  <nav class="pane nav" id="nav" aria-label="Structure"></nav>
+  <section class="pane editor" id="editor" aria-label="Editor"></section>
+  <section class="pane preview" id="preview" aria-label="Preview"></section>
+</main>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js"></script>
+<script>
+(() => {
+"use strict";
+const STORE_KEY = "ispec-builder-v1";
+const KINDS = {
+  topic:   { label: "Topic",   sections: ["Message"] },
+  service: { label: "Service", sections: ["Request", "Response"] },
+  action:  { label: "Action",  sections: ["Goal", "Feedback", "Result"] },
+};
+const TYPES = ["bool","byte","char","int8","uint8","int16","uint16","int32","uint32","int64","uint64","float32","float64","string",
+  "builtin_interfaces/Time","builtin_interfaces/Duration","std_msgs/Header","geometry_msgs/Point","geometry_msgs/Pose","geometry_msgs/PoseStamped",
+  "geometry_msgs/Twist","nav_msgs/Path","sensor_msgs/NavSatFix","diagnostic_msgs/KeyValue[]","NamedPath","NamedPath[]","string[]","float32[]"];
+const uid = () => Math.random().toString(36).slice(2, 10);
+const ICON = {
+  up:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 12V4M4.5 7.5 8 4l3.5 3.5"/></svg>',
+  down:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 4v8m-3.5-3.5L8 12l3.5-3.5"/></svg>',
+  del:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+};
+
+/* ---------- Data ---------- */
+const F = (name, type, desc) => ({ id: uid(), name, type, desc });
+const E = (name, value, desc) => ({ id: uid(), name, value, desc });
+const stdResult = () => [F("success","bool",""), F("error_code","uint8","Error Code."), F("message","string","Human-readable error description.")];
+function newItem(kind = "action") {
+  const fields = {};
+  KINDS[kind].sections.forEach(s => fields[s] = []);
+  if (kind === "action") fields.Result = stdResult();
+  if (kind === "service") fields.Response = stdResult();
+  if (kind === "topic") fields.Message = [F("stamp","builtin_interfaces/Time","timestamp")];
+  return { id: uid(), name: "New " + KINDS[kind].label, ros: "", kind, direction: "out", sender: "", receiver: "", subsystem: "", short: "",
+    description: "", fields, enums: [], notes: [] };
+}
+function seed() {
+  const takeoff = {
+    id: uid(), name: "Takeoff", ros: "mission/takeoff", kind: "action", direction: "out", sender: "", receiver: "", subsystem: "FC Adapter",
+    short: "Takeoff command.",
+    description: "Commands the flight control adapter to arm the propulsion system, perform vertical ascent to the target altitude above ground level and maintain a stable hover.",
+    fields: {
+      Goal: [F("target_altitude_m","float32","Target altitude above ground level in meters."), F("climb_rate_m_s","float32","Climb velocity in m/s. 0.0 uses FC default.")],
+      Feedback: [F("current_altitude_m","float32","Current altitude above ground level in meters."), F("current_climb_rate_m_s","float32","Current climb velocity in m/s."), F("phase","uint8","Current sub-phase of the takeoff maneuver.")],
+      Result: [F("success","bool","True if target altitude was reached and stabilized within tolerances."), F("error_code","uint8","Error Code."), F("message","string","Human-readable error description.")],
+    },
+    enums: [
+      { id: uid(), title: "phase", showValues: true, note: "", rows: [E("PHASE_PRE_ARMING","0","Pre-flight checks and validation."), E("PHASE_ARMING","1","Arm."), E("PHASE_CLIMBING","2","Vertical ascent toward target altitude."), E("PHASE_STABILIZING","3","Stabilizing at target altitude.")] },
+      { id: uid(), title: "error_code", showValues: true, note: "", rows: [E("ERROR_NONE","0","No error."), E("ERROR_ARMING_FAILED","1","FC rejected arming."), E("ERROR_TIMEOUT","2","Action took longer than max allowed time."), E("ERROR_ABORTED","3","Safety or GC intervention."), E("ERROR_ALTITUDE_UNREACHABLE","4","Altitude is not reachable.")] },
+    ],
+    notes: ["Phases and error_code require further arrangement with FC Adapter developer."],
+  };
+  const land = {
+    id: uid(), name: "Land", ros: "mission/land", kind: "action", direction: "out", sender: "", receiver: "", subsystem: "FC Adapter",
+    short: "Land command.", description: "",
+    fields: {
+      Goal: [F("descent_rate_m_s","float32","Target descent velocity in m/s. 0.0 uses FC default."), F("disarm_on_ground","bool","Disarm after confirmed touchdown. Default: True.")],
+      Feedback: [F("current_altitude_m","float32","Current altitude above ground level in meters."), F("current_descent_rate_m_s","float32","Current descent velocity in m/s."), F("phase","uint8","Current sub-phase of the land maneuver.")],
+      Result: [F("success","bool","True if touchdown is confirmed."), F("error_code","uint8","Error Code."), F("message","string","Human-readable error description.")],
+    },
+    enums: [
+      { id: uid(), title: "phase", showValues: true, note: "", rows: [E("PHASE_DESCENDING","0","Controlled descent."), E("PHASE_TOUCHDOWN","1","Ground contact detected."), E("PHASE_DISARMING","2","Disarm.")] },
+      { id: uid(), title: "error_code", showValues: true, note: "", rows: [E("ERROR_NONE","0","No error."), E("ERROR_DISARM_FAILED","1","FC rejected disarming."), E("ERROR_TIMEOUT","2","Action took longer than max allowed time."), E("ERROR_ABORTED","3","Safety or GC intervention."), E("ERROR_UNEVEN_TERRAIN","4","Landing unstable due to ground conditions.")] },
+    ],
+    notes: ["Phases and error_code require further arrangement with FC Adapter developer."],
+  };
+  const hb = {
+    id: uid(), name: "Heartbeat", ros: "navigation/heartbeat", kind: "topic", direction: "in", sender: "Navigation", receiver: "Mission Control", subsystem: "",
+    short: "Periodic health signal of the Navigation node.", description: "",
+    fields: { Message: [F("stamp","builtin_interfaces/Time","timestamp"), F("heartbeat_count","uint64","A monotonically increasing counter."), F("!!ros_lifecycle_state!!","uint8","ROS 2 node lifecycle status.")] },
+    enums: [], notes: [],
+  };
+  return {
+    doc: { title: "Example: Drone Mission Control Interface Specification", subtitle: "", meta: "",
+      notes: "the terms “topic”, “service”, “action” refer to the standard communication methods defined in ROS 2\nstatements denoted in !!red!! indicate aspects that require further evaluation\n“mission” as general prefix should be discussed/standardized",
+      cover: true, toc: true, numbering: true, pageBreak: true, commType: false },
+    groups: [
+      { id: uid(), title: "Data FCI receives from MC", overview: true, items: [takeoff, land] },
+      { id: uid(), title: "Data MC receives from Navigation", overview: false, items: [hb] },
+    ],
+    points: examplePoints(), review: {}, safety: exampleSafety(),
+  };
+}
+
+let state, sel;
+function emptyProject() {
+  return { doc: { title: "Interface Specification", subtitle: "", meta: "", notes: "", cover: true, toc: true, numbering: true, pageBreak: true, commType: false },
+    groups: [{ id: uid(), title: "Data A receives from B", overview: false, items: [] }], review: {}, points: emptyPoints(), safety: minimalSafety() };
+}
+function load() {
+  try { const raw = localStorage.getItem(STORE_KEY); if (raw) { const s = JSON.parse(raw); if (valid(s)) return s; } } catch (e) {}
+  return emptyProject();
+}
+function valid(s) { return s && s.doc && Array.isArray(s.groups); }
+function normalize(s) {
+  s.doc = Object.assign({ title:"", subtitle:"", meta:"", notes:"", cover:true, toc:true, numbering:true, pageBreak:true, commType:false }, s.doc);
+  s.groups.forEach(g => { g.id ||= uid(); g.items ||= []; g.items.forEach(it => {
+    it.id ||= uid(); it.fields ||= {}; it.enums ||= []; it.notes ||= [];
+    Object.values(KINDS).forEach(k => k.sections.forEach(sec => { if (it.kind && KINDS[it.kind].sections.includes(sec)) it.fields[sec] ||= []; }));
+    Object.values(it.fields).forEach(arr => arr.forEach(f => f.id ||= uid()));
+    it.enums.forEach(en => { en.id ||= uid(); en.rows ||= []; en.rows.forEach(r => r.id ||= uid()); if (en.showValues === undefined) en.showValues = true; });
+  }); });
+  if (s.review === undefined || s.review === null || typeof s.review !== "object") s.review = {};
+  s.points = normalizePoints(s.points);
+  migrateReviewKeys(s);
+  s.safety = normalizeSafety(s.safety);
+  return s;
+}
+let saveT;
+function persist() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }, 250); }
+
+/* ---------- Helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") e.className = v;
+    else if (k === "html") e.innerHTML = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (v === true) e.setAttribute(k, "");
+    else e.setAttribute(k, v);
+  }
+  for (const c of kids.flat(9)) { if (c == null || c === false) continue; e.append(c.nodeType ? c : document.createTextNode(String(c))); }
+  return e;
+}
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const splitRed = s => String(s ?? "").split(/(!!.+?!!)/g).filter(Boolean).map(p => /^!!.+!!$/.test(p) ? { t: p.slice(2, -2), red: true } : { t: p, red: false });
+const strip = s => String(s ?? "").replace(/!!(.+?)!!/g, "$1");
+const rich = s => splitRed(s).map(r => r.red ? `<span class="red">${esc(r.t)}</span>` : esc(r.t)).join("").replace(/\n/g, "<br>");
+function grow(el) { el.style.height = "auto"; el.style.height = Math.max(32, el.scrollHeight + 2) + "px"; }
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 3200); }
+
+let refreshT;
+function changed() { persist(); clearTimeout(refreshT); refreshT = setTimeout(() => { renderNav(); renderPreview(); }, 140); }
+function renderAll() { persist(); renderNav(); renderEditor(); renderPreview(); }
+
+function bound(obj, key, { ph = "", multi = false, mono = false, list = null, rows = 2, onEnter = null } = {}) {
+  const id = `in-${obj.id || "doc"}-${key}`;
+  const el = multi ? h("textarea", { id, rows }) : h("input", { type: "text", id, list });
+  el.value = obj[key] ?? ""; el.placeholder = ph; el.spellcheck = !mono;
+  if (mono) el.classList.add("mono");
+  el.addEventListener("input", () => { obj[key] = el.value; if (multi && el.closest(".row")) grow(el); changed(); });
+  if (onEnter) el.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onEnter(); } });
+  return el;
+}
+function labeled(text, el, cls) { return h("label", { class: "f " + (cls || "") }, h("span", null, text), el); }
+function checkbox(obj, key, text, after) {
+  const id = `cb-${obj.id || "doc"}-${key}`;
+  const cb = h("input", { type: "checkbox", id }); cb.checked = !!obj[key];
+  cb.addEventListener("change", () => { obj[key] = cb.checked; after ? after() : changed(); });
+  return h("label", { class: "check", for: id }, cb, text);
+}
+function seg(options, value, onPick) {
+  return h("div", { class: "seg", role: "group" }, options.map(([v, lbl]) =>
+    h("button", { type: "button", "aria-pressed": String(v === value), onclick: () => onPick(v) }, lbl)));
+}
+function armedBtn(cls, html, title, action, armLabel) {
+  const b = h("button", { type: "button", class: cls, title, html });
+  b.addEventListener("click", () => {
+    if (b.dataset.armed) { action(); return; }
+    b.dataset.armed = "1"; b.classList.add("armed");
+    if (armLabel) { b.dataset.html = b.innerHTML; b.textContent = armLabel; }
+    setTimeout(() => { delete b.dataset.armed; b.classList.remove("armed"); if (armLabel && b.isConnected) b.innerHTML = b.dataset.html; }, 2600);
+  });
+  return b;
+}
+function move(arr, i, d) { const j = i + d; if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; renderAll(); }
+function focusLast(sel2) { requestAnimationFrame(() => { const els = document.querySelectorAll(sel2); const el = els[els.length - 1]; if (el) el.focus(); }); }
+
+function find() {
+  if (sel.type === "doc" || sel.type === "review" || sel.type === "safety") return {};
+  const gi = state.groups.findIndex(g => g.id === sel.gid); const g = state.groups[gi];
+  if (!g) { sel = { type: "doc" }; return {}; }
+  if (sel.type === "group") return { g, gi };
+  const ii = g.items.findIndex(i => i.id === sel.iid);
+  if (ii < 0) { sel = { type: "group", gid: g.id }; return { g, gi }; }
+  return { g, gi, it: g.items[ii], ii };
+}
+const gNum = gi => String.fromCharCode(65 + gi);
+const iNum = (gi, ii) => `${gNum(gi)}.${ii + 1}`;
+
+/* ---------- Navigation ---------- */
+function renderNav() {
+  const nav = $("#nav"); nav.textContent = "";
+  $("#docName").textContent = state.doc.title || "";
+  const n = state.doc.numbering;
+  nav.append(h("h4", null, "Document"),
+    h("button", { class: "nav-item", "aria-current": String(sel.type === "doc"), onclick: () => select({ type: "doc" }) },
+      h("span", { class: "t" }, h("b", null, state.doc.title || "Untitled"), h("small", null, "Cover & options"))),
+    ...reviewNav(),
+    ...safetyNav(),
+    h("h4", null, "Sections & interfaces"));
+  state.groups.forEach((g, gi) => {
+    nav.append(h("div", { class: "group-row" },
+      h("button", { class: "nav-item", "aria-current": String(sel.type === "group" && sel.gid === g.id), onclick: () => select({ type: "group", gid: g.id }) },
+        n ? h("span", { class: "num" }, gNum(gi)) : null, h("span", { class: "t" }, h("b", null, g.title || "Untitled")))));
+    const list = h("div", { class: "nav-list" });
+    g.items.forEach((it, ii) => list.append(
+      h("button", { class: "nav-item", "aria-current": String(sel.type === "item" && sel.iid === it.id), onclick: () => select({ type: "item", gid: g.id, iid: it.id }) },
+        h("span", { class: "kind " + it.kind }, it.kind[0].toUpperCase()),
+        h("span", { class: "t" }, h("b", null, (n ? iNum(gi, ii) + "  " : "") + strip(it.name || "Unnamed")), h("small", null, strip(it.ros) || "—")))));
+    list.append(h("div", { class: "add-row" },
+      h("button", { class: "btn ghost small", onclick: () => addItem(g, "action") }, "+ Interface")));
+    nav.append(list);
+  });
+  nav.append(h("div", { class: "add-row", style: "margin-top:12px" },
+    h("button", { class: "btn small", onclick: addGroup }, "+ Section")));
+}
+function select(s) { sel = s; if (window.matchMedia("(max-width:760px)").matches) setView("edit"); renderAll(); $("#editor").scrollTop = 0; }
+function addGroup() { const g = { id: uid(), title: "Data X receives from Y", overview: false, items: [] }; state.groups.push(g); select({ type: "group", gid: g.id }); }
+function addItem(g, kind) { const it = newItem(kind); g.items.push(it); select({ type: "item", gid: g.id, iid: it.id }); requestAnimationFrame(() => { const el = $(`#in-${it.id}-name`); if (el) { el.focus(); el.select(); } }); }
+
+/* ---------- Editor ---------- */
+function renderEditor() {
+  const ed = $("#editor"); ed.textContent = "";
+  const f = find();
+  const focusId = sel.type === "review" ? sel.focus : null;
+  if (focusId) { rvFilter = "all"; rvSearch = ""; rvTeam = ""; delete sel.focus; }
+  let parts;
+  if (sel.type === "doc") parts = docEditor();
+  else if (sel.type === "review") parts = reviewBoard();
+  else if (sel.type === "safety") parts = safetyEditor();
+  else if (sel.type === "group") parts = groupEditor(f.g, f.gi);
+  else parts = itemEditor(f.g, f.gi, f.it, f.ii);
+  ed.append(...parts.filter(Boolean));
+  requestAnimationFrame(() => {
+    ed.querySelectorAll(".row textarea").forEach(grow);
+    if (focusId) { const el = document.getElementById("qc-" + focusId); if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("flash"); } }
+  });
+}
+
+function docEditor() {
+  const d = state.doc;
+  return [
+    h("div", { class: "ed-head" }, h("div", null, h("div", { class: "crumb" }, "Document"), h("h2", null, "Cover & options"))),
+    projectIsEmpty() ? h("div", { class: "card", style: "border-color:var(--accent)" }, h("h3", null, "Get started"),
+      h("ol", { class: "rules" },
+        h("li", null, "Give the document a title below."),
+        h("li", null, "Rename the section on the left and add interfaces with “+ Interface”."),
+        h("li", null, "Track open questions under “Open points”, e.g. by importing a review as Markdown."),
+        h("li", null, "Describe hazards and reactions under “Safety concept” and test them in the simulator."),
+        h("li", null, "Export with “Create PDF” or “Markdown”. Save your work with “JSON”.")),
+      h("div", { class: "danger-zone", style: "margin-top:10px" },
+        h("button", { class: "btn", onclick: () => { state = normalize(seed()); sel = { type: "doc" }; renderAll(); toast("Example loaded"); } }, "Look at an example project first"))) : null,
+    h("div", { class: "card" }, h("h3", null, "Cover page"),
+      h("div", { class: "grid" },
+        labeled("Title", bound(d, "title", { ph: "e.g. Mission Control Interface Specification" }), "full"),
+        labeled("Subtitle", bound(d, "subtitle", { ph: "e.g. Data exchange FCI ↔ MC" })),
+        labeled("Meta line", bound(d, "meta", { ph: "Version 0.3 · October 2026 · Team" })),
+        labeled("Notes (one line per item)", bound(d, "notes", { multi: true, rows: 4, ph: "statements denoted in !!red!! indicate …" }), "full")),
+      h("p", { class: "hint", style: "margin:10px 0 0" }, "Everywhere: ", h("code", null, "!!text!!"), " is rendered red and bold, e.g. to mark aspects that still need to be clarified.")),
+    h("div", { class: "card" }, h("h3", null, "Output"),
+      h("div", { class: "opts" },
+        checkbox(d, "cover", "Cover page with notes", renderAll),
+        checkbox(d, "toc", "Table of contents", renderAll),
+        checkbox(d, "numbering", "Numbering (A, A.1 …)", renderAll),
+        checkbox(d, "pageBreak", "Each interface on a new page", renderAll),
+        checkbox(d, "commType", "Print “Communication type”", renderAll))),
+    h("div", { class: "card" }, h("h3", null, "Project"),
+      h("div", { class: "danger-zone" },
+        armedBtn("btn", "Load example", "Replaces the whole project with the drone example", () => { state = normalize(seed()); sel = { type: "doc" }; renderAll(); toast("Example loaded"); }, "Replace project?"),
+        armedBtn("btn danger", "Empty project", "Deletes all content", () => { state = normalize(emptyProject()); sel = { type: "doc" }; renderAll(); toast("Empty project created"); }, "Delete everything?")),
+      h("p", { class: "hint", style: "margin:10px 0 0" }, "Changes are saved automatically in this browser. “JSON” saves the whole project (interfaces, open points, safety concept) as a file. “Open” replaces the current project with such a file.")),
+    importPartsCard(),
+  ];
+}
+let pendingImport = null;
+const projectIsEmpty = () => state.groups.every(g => !g.items.length) && !state.points.sections.length && !state.safety.hazards.length;
+function importPartsCard() {
+  const file = h("input", { type: "file", id: "parts-file", accept: ".json,application/json", hidden: true });
+  file.addEventListener("change", async () => {
+    const f = file.files[0]; file.value = ""; if (!f) return;
+    try { const s = JSON.parse(await f.text()); if (!valid(s)) throw new Error("not a project");
+      pendingImport = { name: f.name, data: normalize(s), groups: true, points: true, safety: false }; renderEditor(); }
+    catch (err) { toast("This file is not a valid project (expected JSON from this tool)."); }
+  });
+  const card = h("div", { class: "card" }, h("h3", null, "Import into this project"),
+    h("p", { class: "hint", style: "margin:0 0 10px" }, "Adds selected parts of another project file to the current project. Nothing else changes."), file);
+  if (!pendingImport) { card.append(h("button", { class: "btn", onclick: () => file.click() }, "Choose project file …")); return card; }
+  const d = pendingImport.data; const nPts = d.points.sections.reduce((n, s) => n + s.items.length, 0);
+  const opt = (key, text) => checkbox(pendingImport, key, text, renderEditor);
+  card.append(h("p", { style: "margin:0 0 8px" }, h("b", null, pendingImport.name)),
+    h("div", { class: "opts" },
+      opt("groups", `Interface sections (${d.groups.length}) – added`),
+      opt("points", `Open points (${nPts}) – added, IDs kept unique`),
+      opt("safety", `Safety concept (${d.safety.hazards.length} hazards) – replaces the current one`)),
+    h("div", { class: "danger-zone", style: "margin-top:10px" },
+      h("button", { class: "btn primary", onclick: () => { mergeImport(pendingImport); pendingImport = null; renderAll(); } }, "Import selected"),
+      h("button", { class: "btn ghost", onclick: () => { pendingImport = null; renderEditor(); } }, "Cancel")));
+  return card;
+}
+function mergeImport(pi) {
+  const d = pi.data; const msg = [];
+  if (pi.groups) {
+    d.groups.forEach(g => { g.id = uid(); g.items.forEach(it => { it.id = uid(); Object.values(it.fields).forEach(a => a.forEach(f => f.id = uid())); it.enums.forEach(en => { en.id = uid(); en.rows.forEach(r => r.id = uid()); }); }); state.groups.push(g); });
+    msg.push(`${d.groups.length} section(s)`);
+  }
+  if (pi.points) {
+    const used = new Set(allPoints().map(p => p.code)); let n = 0, renamed = 0;
+    d.points.sections.forEach(sec => {
+      sec.id = uid();
+      sec.items.forEach(p => {
+        const r = d.review[p.id]; p.id = uid();
+        if (used.has(p.code)) { p.code = nextCodeIn(prefixOf(sec.title), used); renamed++; }
+        used.add(p.code); if (r) state.review[p.id] = JSON.parse(JSON.stringify(r)); n++;
+      });
+      if (sec.items.length) state.points.sections.push(sec);
+    });
+    msg.push(`${n} open point(s)` + (renamed ? ` (${renamed} renamed to keep IDs unique)` : ""));
+  }
+  if (pi.safety) { state.safety = d.safety; msg.push("the safety concept"); }
+  toast(msg.length ? "Imported " + msg.join(", ") : "Nothing selected");
+}
+
+function groupEditor(g, gi) {
+  return [
+    h("div", { class: "ed-head" }, h("div", null, h("div", { class: "crumb" }, "Section" + (state.doc.numbering ? " " + gNum(gi) : "")), h("h2", null, g.title || "Untitled"))),
+    h("div", { class: "card" }, h("h3", null, "Section"),
+      h("div", { class: "grid" }, labeled("Heading", bound(g, "title", { ph: "Data MC receives from GCS" }), "full")),
+      h("div", { style: "margin-top:12px" }, checkbox(g, "overview", "Overview table at the start (name, direction, short description, page)", renderAll))),
+    h("div", { class: "card" }, h("h3", null, "New interface"),
+      h("div", { class: "danger-zone" }, Object.entries(KINDS).map(([k, v]) => h("button", { class: "btn", onclick: () => addItem(g, k) }, h("span", { class: "kind " + k }, k[0].toUpperCase()), v.label)))),
+    h("div", { class: "card" }, h("h3", null, "Order & delete"),
+      h("div", { class: "danger-zone" },
+        h("button", { class: "btn", onclick: () => move(state.groups, gi, -1), disabled: gi === 0 }, "Move up"),
+        h("button", { class: "btn", onclick: () => move(state.groups, gi, 1), disabled: gi === state.groups.length - 1 }, "Move down"),
+        armedBtn("btn danger", "Delete section", "Deletes the section with all its interfaces", () => {
+          state.groups.splice(gi, 1); sel = { type: "doc" }; renderAll(); toast("Section deleted");
+        }, `Delete with ${g.items.length} interface(s)?`))),
+  ];
+}
+
+function itemEditor(g, gi, it, ii) {
+  const kinds = KINDS[it.kind];
+  const general = h("div", { class: "card" }, h("h3", null, "General"),
+    h("div", { class: "grid" },
+      labeled("Name", bound(it, "name", { ph: "Takeoff" })),
+      labeled("ROS-Name", bound(it, "ros", { ph: "mission/takeoff", mono: true })),
+      h("div", { class: "f full", style: "display:flex;gap:18px;flex-wrap:wrap" },
+        labeled("Type", seg(Object.entries(KINDS).map(([k, v]) => [k, v.label]), it.kind, v => {
+          it.kind = v; KINDS[v].sections.forEach(s => it.fields[s] ||= []); renderAll(); })),
+        labeled("Direction", seg([["in", "in"], ["out", "out"]], it.direction, v => { it.direction = v; renderAll(); }))),
+      labeled("Sender (optional)", bound(it, "sender", { ph: "Navigation" })),
+      labeled("Receiver (optional)", bound(it, "receiver", { ph: "Mission Control" })),
+      labeled("Short description (for overview)", bound(it, "short", { ph: "Takeoff command." })),
+      labeled("Subsystem (for overview)", bound(it, "subsystem", { ph: "FC Adapter" })),
+      labeled("Description (below the tables)", bound(it, "description", { multi: true, rows: 3, ph: "Commands the flight control adapter to …" }), "full")));
+
+  const params = h("div", { class: "card" }, h("h3", null, "Parameter", h("span", { class: "sp" }), h("span", { class: "hint", style: "text-transform:none;letter-spacing:0;font-weight:400" }, "Enter in the last row = new row")),
+    kinds.sections.map(s => fieldBlock(it, s)));
+
+  const enums = h("div", { class: "card" }, h("h3", null, "Classifications (enums)"),
+    it.enums.length ? null : h("p", { class: "hint", style: "margin:0" }, "For values like phase or error_code. Rendered as a “Classification of …” table."),
+    it.enums.map((en, ei) => enumBlock(it, en, ei)),
+    h("div", { class: "danger-zone", style: "margin-top:10px" },
+      h("button", { class: "btn small", onclick: () => addEnum(it, "") }, "+ Classification"),
+      h("button", { class: "btn small", onclick: () => addEnum(it, "error_code", [E("ERROR_NONE", "0", "No error.")]) }, "+ error_code"),
+      h("button", { class: "btn small", onclick: () => addEnum(it, "phase") }, "+ phase")));
+
+  const notes = h("div", { class: "card" }, h("h3", null, "Notes"),
+    it.notes.map((nt, ni) => {
+      const holder = { id: it.id + "-n" + ni, v: nt };
+      const ta = h("textarea", { id: `in-${it.id}-note-${ni}`, rows: 2 }); ta.value = nt;
+      ta.addEventListener("input", () => { it.notes[ni] = ta.value; changed(); });
+      return h("div", { class: "note-row" }, ta,
+        armedBtn("icon del", ICON.del, "Delete note", () => { it.notes.splice(ni, 1); renderAll(); }));
+    }),
+    h("button", { class: "btn small", onclick: () => { it.notes.push(""); renderAll(); focusLast(".note-row textarea"); } }, "+ Note"),
+    h("p", { class: "hint", style: "margin:8px 0 0" }, "Rendered in italics with a red “Note:”, after the classifications."));
+
+  const ros = rosDef(it);
+  const rosCard = h("div", { class: "card" }, h("h3", null, `ROS-Definition (.${ros.ext})`, h("span", { class: "sp" }),
+      h("button", { class: "btn small", onclick: () => copy(ros.text) }, "Copy")),
+    h("pre", { class: "code" }, ros.text));
+
+  const groupSel = h("select", { id: `mv-${it.id}`, style: "width:auto" }, state.groups.map(gg => h("option", { value: gg.id, selected: gg.id === g.id }, "In: " + (gg.title || "Untitled"))));
+  groupSel.addEventListener("change", () => {
+    const target = state.groups.find(x => x.id === groupSel.value); if (!target || target === g) return;
+    g.items.splice(ii, 1); target.items.push(it); sel = { type: "item", gid: target.id, iid: it.id }; renderAll(); toast("Moved");
+  });
+  const manage = h("div", { class: "card" }, h("h3", null, "Manage"),
+    h("div", { class: "danger-zone" },
+      h("button", { class: "btn", onclick: () => move(g.items, ii, -1), disabled: ii === 0 }, "Move up"),
+      h("button", { class: "btn", onclick: () => move(g.items, ii, 1), disabled: ii === g.items.length - 1 }, "Move down"),
+      h("button", { class: "btn", onclick: () => {
+        const c = normalize({ doc: {}, groups: [{ items: [JSON.parse(JSON.stringify(it))] }] }).groups[0].items[0];
+        c.id = uid(); Object.values(c.fields).forEach(a => a.forEach(x => x.id = uid())); c.enums.forEach(en => { en.id = uid(); en.rows.forEach(r => r.id = uid()); });
+        c.name += " (copy)"; g.items.splice(ii + 1, 0, c); select({ type: "item", gid: g.id, iid: c.id }); } }, "Duplicate"),
+      groupSel,
+      armedBtn("btn danger", "Delete", "Delete interface", () => { g.items.splice(ii, 1); sel = { type: "group", gid: g.id }; renderAll(); toast("Interface deleted"); }, "Really delete?")));
+
+  return [
+    h("div", { class: "ed-head" }, h("div", null,
+      h("div", { class: "crumb" }, (g.title || "Untitled") + (state.doc.numbering ? " · " + iNum(gi, ii) : "")),
+      h("h2", null, strip(it.name) || "Unnamed"))),
+    general, relatedCard(it), params, enums, notes, rosCard, manage,
+  ];
+}
+
+function fieldBlock(it, sec) {
+  const arr = it.fields[sec] ||= [];
+  const addRow = (preset) => { arr.push(preset || F("", "", "")); renderAll(); focusLast(`.fb-${it.id}-${sec} .row:not(.head) input`); };
+  const rows = h("div", { class: "rows" },
+    arr.length ? h("div", { class: "row head" }, h("div", null, "Parameter Name"), h("div", null, "Datatype"), h("div", null, "Description"), h("div", { style: "width:78px" })) : h("div", { class: "empty" }, "No parameters yet."),
+    arr.map((f, i) => {
+      const enter = i === arr.length - 1 ? () => addRow() : null;
+      return h("div", { class: "row" },
+        bound(f, "name", { ph: "name", mono: true, onEnter: enter }),
+        bound(f, "type", { ph: "type", mono: true, list: "types", onEnter: enter }),
+        bound(f, "desc", { ph: "Description", multi: true, rows: 1 }),
+        h("div", { class: "row-tools" },
+          h("button", { class: "icon", title: "Move up", html: ICON.up, onclick: () => move(arr, i, -1) }),
+          h("button", { class: "icon", title: "Move down", html: ICON.down, onclick: () => move(arr, i, 1) }),
+          armedBtn("icon del", ICON.del, "Delete row (click twice)", () => { arr.splice(i, 1); renderAll(); })));
+    }));
+  const presets = [];
+  if (sec === "Result" || sec === "Response") presets.push(h("button", { class: "btn ghost small", onclick: () => { arr.push(...stdResult()); renderAll(); } }, "+ success / error_code / message"));
+  if (sec === "Message") {
+    presets.push(h("button", { class: "btn ghost small", onclick: () => addRow(F("stamp", "builtin_interfaces/Time", "timestamp")) }, "+ stamp"));
+    presets.push(h("button", { class: "btn ghost small", onclick: () => addRow(F("mission_id", "string", "The unique mission identifier. Defined in the mission configuration.")) }, "+ mission_id"));
+  }
+  if (sec === "Request" || sec === "Goal") presets.push(h("button", { class: "btn ghost small", onclick: () => addRow(F("mission_id", "string", "The unique mission identifier. Defined in the mission configuration.")) }, "+ mission_id"));
+  return h("div", { class: `block fb-${it.id}-${sec}` },
+    it.kind === "topic" ? null : h("div", { class: "block-h" }, h("b", null, sec)),
+    rows,
+    h("div", { class: "foot" }, h("button", { class: "btn small", onclick: () => addRow() }, "+ Parameter"), presets));
+}
+
+function addEnum(it, title, rows) {
+  it.enums.push({ id: uid(), title, showValues: true, note: "", rows: rows || [E("", "0", "")] }); renderAll();
+  if (!title) focusLast(".enum-title input");
+}
+function enumBlock(it, en, ei) {
+  const nv = !en.showValues;
+  const addRow = () => {
+    const last = en.rows[en.rows.length - 1]; const nx = last && /^-?\d+$/.test(last.value) ? String(+last.value + 1) : String(en.rows.length);
+    const prefix = last ? (last.name.match(/^([A-Z]+_)/) || [])[1] || "" : "";
+    en.rows.push(E(prefix, nx, "")); renderAll(); focusLast(`.en-${en.id} .row:not(.head) input`);
+  };
+  return h("div", { class: `block en-${en.id}` },
+    h("div", { class: "block-h" },
+      h("div", { class: "enum-title" }, h("span", null, "Classification of"), bound(en, "title", { ph: "error_code", mono: true })),
+      checkbox(en, "showValues", "Values", renderAll),
+      h("button", { class: "icon", title: "Move up", html: ICON.up, onclick: () => move(it.enums, ei, -1) }),
+      h("button", { class: "icon", title: "Move down", html: ICON.down, onclick: () => move(it.enums, ei, 1) }),
+      armedBtn("icon del", ICON.del, "Delete classification (click twice)", () => { it.enums.splice(ei, 1); renderAll(); })),
+    h("div", { class: "rows" },
+      en.rows.map((r, i) => {
+        const enter = i === en.rows.length - 1 ? addRow : null;
+        return h("div", { class: "row enum" + (nv ? " novals" : "") },
+          bound(r, "name", { ph: "ERROR_NONE", mono: true, onEnter: enter }),
+          nv ? null : bound(r, "value", { ph: "0", mono: true, onEnter: enter }),
+          bound(r, "desc", { ph: "Description", multi: true, rows: 1 }),
+          h("div", { class: "row-tools" },
+            h("button", { class: "icon", title: "Move up", html: ICON.up, onclick: () => move(en.rows, i, -1) }),
+            h("button", { class: "icon", title: "Move down", html: ICON.down, onclick: () => move(en.rows, i, 1) }),
+            armedBtn("icon del", ICON.del, "Delete row (click twice)", () => { en.rows.splice(i, 1); renderAll(); })));
+      })),
+    h("div", { class: "foot", style: "flex-direction:column;align-items:stretch" },
+      h("div", null, h("button", { class: "btn small", onclick: addRow }, "+ Entry")),
+      labeled("Note directly below this table (optional)", bound(en, "note", { multi: true, rows: 1, ph: "Should it be possible to abort …" }))));
+}
+
+/* ---------- ROS definition ---------- */
+function rosDef(it) {
+  const secs = KINDS[it.kind].sections; const ext = { topic: "msg", service: "srv", action: "action" }[it.kind];
+  const placed = new Set();
+  const blocks = secs.map(s => {
+    const lines = [];
+    const fields = it.fields[s] || [];
+    it.enums.forEach(en => {
+      if (placed.has(en.id) || !en.showValues) return;
+      const fld = fields.find(f => strip(f.name).trim().toLowerCase() === strip(en.title).trim().toLowerCase());
+      const fallback = !it.enums.some(x => x === en) ? false : s === secs[secs.length - 1] && !secs.some(ss => (it.fields[ss] || []).some(f => strip(f.name).trim().toLowerCase() === strip(en.title).trim().toLowerCase()));
+      if (!fld && !fallback) return;
+      placed.add(en.id);
+      const t = fld ? strip(fld.type).trim() || "uint8" : "uint8";
+      lines.push(`# ${strip(en.title)}`);
+      en.rows.forEach(r => lines.push(`${t} ${strip(r.name).trim()}=${strip(r.value).trim()}${r.desc ? "  # " + strip(r.desc).replace(/\n/g, " ") : ""}`));
+      lines.push("");
+    });
+    fields.forEach(f => lines.push(`${strip(f.type).trim() || "?"} ${strip(f.name).trim() || "?"}${f.desc ? "  # " + strip(f.desc).replace(/\n/g, " ") : ""}`));
+    return (it.kind === "topic" ? "" : `# ${s}\n`) + lines.join("\n");
+  });
+  return { ext, text: blocks.join("\n---\n") || "# (leer)" };
+}
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); toast("Copied to clipboard"); }
+  catch (e) { const ta = h("textarea", { style: "position:fixed;opacity:0" }); ta.value = text; document.body.append(ta); ta.select(); try { document.execCommand("copy"); toast("Copied"); } catch (x) { toast("Copy not possible, please select the text"); } ta.remove(); }
+}
+
+/* ---------- HTML preview ---------- */
+function paramTableHTML(it) {
+  const secs = KINDS[it.kind].sections; let html = '<table class="pt"><colgroup><col><col><col></colgroup><tbody>';
+  secs.forEach((s, i) => {
+    if (it.kind !== "topic") html += `<tr class="blk${i === 0 ? " thick" : ""}"><td colspan="3">${esc(s)}</td></tr>`;
+    if (i === 0) html += '<tr class="hd thick"><th>Parameter Name</th><th>Datatype</th><th>Description</th></tr>';
+    (it.fields[s] || []).forEach(f => html += `<tr><td>${rich(f.name)}</td><td>${rich(f.type)}</td><td>${rich(f.desc)}</td></tr>`);
+  });
+  return html + "</tbody></table>";
+}
+function enumTableHTML(en) {
+  const nv = !en.showValues; let html = `<table class="en"><tbody><tr class="blk thick"><td colspan="${nv ? 2 : 3}">Classification of ${rich(en.title)}</td></tr>`;
+  en.rows.forEach(r => html += nv ? `<tr><td>${rich(r.name)}</td><td>${rich(r.desc)}</td></tr>` : `<tr><td style="width:44%">${rich(r.name)}</td><td class="v">${rich(r.value)}</td><td>${rich(r.desc)}</td></tr>`);
+  html += "</tbody></table>";
+  if (en.note && en.note.trim()) html += `<p class="note"><b>Note:</b> ${rich(en.note)}</p>`;
+  return html;
+}
+function itemHTML(it, num) {
+  let html = `<p class="ttl">${num ? esc(num) + " " : ""}${rich(it.name)}</p><p class="ros">${rich(it.ros)}</p><div class="meta"><div>Direction: ${esc(it.direction)}</div>`;
+  if (it.sender || it.receiver) html += `<div>${[it.sender && "Sender: " + rich(it.sender), it.receiver && "Receiver: " + rich(it.receiver)].filter(Boolean).join(" | ")}</div>`;
+  if (state.doc.commType) html += `<div>Communication type: ${KINDS[it.kind].label}</div>`;
+  html += "</div>" + paramTableHTML(it) + it.enums.map(enumTableHTML).join("");
+  it.notes.filter(n => n.trim()).forEach(n => html += `<p class="note"><b>Note:</b> ${rich(n)}</p>`);
+  String(it.description || "").split(/\n\s*\n/).filter(p => p.trim()).forEach(p => html += `<p>${rich(p)}</p>`);
+  return html;
+}
+function overviewHTML(g, gi) {
+  const kindsIn = [...new Set(g.items.map(i => i.kind))];
+  const nameHd = kindsIn.length === 1 ? KINDS[kindsIn[0]].label + " Name" : "Name";
+  const sub = g.items.some(i => i.subsystem);
+  let html = `<p class="ttl" style="margin-bottom:8px">Overview</p><table><tbody><tr class="hd thick"><th>${nameHd}</th><th style="width:16%">Direction</th><th>Short Description</th>${sub ? "<th>Subsystem</th>" : ""}<th style="width:10%">Page</th></tr>`;
+  g.items.forEach(it => html += `<tr><td>${rich(it.ros || it.name)}</td><td>${esc(it.direction)}</td><td>${rich(it.short)}</td>${sub ? `<td>${rich(it.subsystem)}</td>` : ""}<td>#</td></tr>`);
+  return html + "</tbody></table>";
+}
+function renderPreview() {
+  const pv = $("#preview"); const f = find(); const d = state.doc;
+  if (sel.type === "safety") {
+    pv.innerHTML = `<div class="pv-caption"><span>Preview · Safety concept</span><span class="pill">A4 · PDF</span></div><div class="paper">${safetyHTML()}</div>`;
+    return;
+  }
+  if (sel.type === "review") {
+    pv.innerHTML = `<div class="pv-caption"><span>Preview · Answer sheet (Markdown export)</span><span class="pill">${esc(today())}</span></div><div class="paper">${answersHTML()}</div>`;
+    return;
+  }
+  let cap = "", body = "";
+  if (sel.type === "doc") {
+    cap = "Cover page";
+    if (!d.cover) body = '<p style="color:#666">Cover page is turned off. The PDF starts directly with the first section.</p>';
+    else {
+      body = `<h1>${rich(d.title)}</h1>${d.subtitle ? `<p class="sub">${rich(d.subtitle)}</p>` : ""}${d.meta ? `<p class="small">${rich(d.meta)}</p>` : '<div style="height:14px"></div>'}`;
+      const notes = String(d.notes || "").split("\n").filter(l => l.trim());
+      if (notes.length) body += `<div class="notes"><b>! Notes</b><ul>${notes.map(n => `<li>${rich(n)}</li>`).join("")}</ul></div>`;
+      if (d.toc) {
+        body += '<p class="ttl" style="margin-bottom:6px">Contents</p><div class="toc">';
+        state.groups.forEach((g, gi) => {
+          body += `<div><span>${d.numbering ? gNum(gi) + " " : ""}${rich(g.title)}</span><span class="d"></span><span>#</span></div>`;
+          g.items.forEach((it, ii) => body += `<div class="sub"><span>${d.numbering ? iNum(gi, ii) + " " : ""}${rich(it.name)}</span><span class="d"></span><span>#</span></div>`);
+        });
+        body += "</div>";
+      }
+    }
+  } else if (sel.type === "group") {
+    cap = "Section";
+    body = `<h2>${d.numbering ? gNum(f.gi) + "&nbsp;&nbsp;" : ""}${rich(f.g.title)}</h2>`;
+    if (f.g.overview && f.g.items.length) body += overviewHTML(f.g, f.gi);
+    else if (!f.g.items.length) body += '<p style="color:#666">No interfaces in this section yet.</p>';
+    else body += '<p style="color:#666">Overview table is turned off.</p>';
+  } else {
+    cap = KINDS[f.it.kind].label;
+    const first = f.ii === 0;
+    if (first) body += `<h2>${d.numbering ? gNum(f.gi) + "&nbsp;&nbsp;" : ""}${rich(f.g.title)}</h2>`;
+    body += itemHTML(f.it, d.numbering ? iNum(f.gi, f.ii) : "");
+  }
+  pv.innerHTML = `<div class="pv-caption"><span>Preview · ${esc(cap)}</span><span class="pill">A4 · PDF</span></div><div class="paper">${body}</div>`;
+}
+
+/* ---------- PDF ---------- */
+const RED = "#d0021b";
+const rt = (s, extra) => { const r = splitRed(s).map(p => Object.assign(p.red ? { text: p.t, color: RED, bold: true } : { text: p.t }, extra || {})); return r.length ? r : [{ text: "" }]; };
+const lay = thick => ({ hLineWidth: i => thick.has(i) ? 1.1 : 0.5, vLineWidth: () => 0.5, hLineColor: () => "#8e959b", vLineColor: () => "#8e959b",
+  paddingLeft: () => 5, paddingRight: () => 5, paddingTop: () => 2.5, paddingBottom: () => 2.5 });
+function pdfParams(it) {
+  const secs = KINDS[it.kind].sections; const body = []; const thick = new Set();
+  secs.forEach((s, i) => {
+    if (it.kind !== "topic") { body.push([{ text: s, bold: true, colSpan: 3 }, {}, {}]); if (i === 0) thick.add(body.length); }
+    if (i === 0) { body.push(["Parameter Name", "Datatype", "Description"].map(t => ({ text: t, bold: true }))); thick.add(body.length); }
+    (it.fields[s] || []).forEach(f => body.push([{ text: rt(f.name) }, { text: rt(f.type) }, { text: rt(f.desc) }]));
+  });
+  return { table: { widths: ["*", "*", "*"], body, dontBreakRows: true }, layout: lay(thick), margin: [0, 0, 0, 12] };
+}
+function pdfEnum(en) {
+  const nv = !en.showValues; const n = nv ? 2 : 3;
+  const head = [{ text: rt("Classification of " + en.title), bold: true, colSpan: n }]; for (let i = 1; i < n; i++) head.push({});
+  const body = [head];
+  en.rows.forEach(r => body.push(nv ? [{ text: rt(r.name) }, { text: rt(r.desc) }] : [{ text: rt(r.name) }, { text: rt(r.value), alignment: "center" }, { text: rt(r.desc) }]));
+  const out = [{ table: { widths: nv ? ["50%", "*"] : ["40%", 14, "*"], body, dontBreakRows: true, headerRows: 1 }, layout: lay(new Set([1])), fontSize: 8.6, margin: [0, 0, 0, en.note && en.note.trim() ? 6 : 12] }];
+  if (en.note && en.note.trim()) out.push(pdfNote(en.note));
+  return out;
+}
+const pdfNote = n => ({ text: [{ text: "Note: ", bold: true, color: RED, italics: true }, ...rt(n, { italics: true })], margin: [0, 0, 0, 12] });
+function pdfItem(it, num, opts) {
+  const meta = [{ text: "Direction: " + it.direction }];
+  if (it.sender || it.receiver) meta.push({ text: [it.sender && "Sender: " + strip(it.sender), it.receiver && "Receiver: " + strip(it.receiver)].filter(Boolean).join(" | ") });
+  if (state.doc.commType) meta.push({ text: "Communication type: " + KINDS[it.kind].label });
+  const out = [
+    { text: (num ? num + "  " : "") + strip(it.name), bold: true, fontSize: 11.5, id: "it-" + it.id, tocItem: state.doc.toc, tocMargin: [14, 0, 0, 0], pageBreak: opts.breakBefore ? "before" : undefined, margin: [0, opts.breakBefore ? 0 : 10, 0, 1] },
+    { text: rt(it.ros), bold: true, fontSize: 11, margin: [0, 0, 0, 8] },
+    { stack: meta, margin: [0, 0, 0, 10] },
+    pdfParams(it),
+    ...it.enums.flatMap(pdfEnum),
+    ...it.notes.filter(n => n.trim()).map(pdfNote),
+    ...String(it.description || "").split(/\n\s*\n/).filter(p => p.trim()).map(p => ({ text: rt(p), margin: [0, 0, 0, 8] })),
+  ];
+  return out;
+}
+function pdfOverview(g) {
+  const kindsIn = [...new Set(g.items.map(i => i.kind))];
+  const nameHd = kindsIn.length === 1 ? KINDS[kindsIn[0]].label + " Name" : "Name";
+  const sub = g.items.some(i => i.subsystem);
+  const hd = [nameHd, "Direction", "Short Description"].concat(sub ? ["Subsystem"] : [], ["Page"]).map(t => ({ text: t, bold: true }));
+  const body = [hd];
+  g.items.forEach(it => body.push([{ text: rt(it.ros || it.name) }, { text: it.direction }, { text: rt(it.short) }].concat(sub ? [{ text: rt(it.subsystem) }] : [], [{ pageReference: "it-" + it.id, alignment: "center" }])));
+  return [{ text: "Overview", bold: true, fontSize: 11.5, margin: [0, 0, 0, 6] },
+    { table: { widths: sub ? ["*", 52, "*", 70, 30] : ["*", 52, "*", 30], body, headerRows: 1, dontBreakRows: true }, layout: lay(new Set([1])), margin: [0, 0, 0, 16] }];
+}
+function buildPdf() {
+  const d = state.doc; const content = [];
+  if (d.cover) {
+    content.push({ text: strip(d.title), fontSize: 20, bold: true, margin: [0, 0, 0, 4] });
+    if (d.subtitle) content.push({ text: rt(d.subtitle), fontSize: 13, margin: [0, 0, 0, 2] });
+    if (d.meta) content.push({ text: rt(d.meta), fontSize: 9.5, color: "#555", margin: [0, 2, 0, 0] });
+    content.push({ text: " ", margin: [0, 6, 0, 6] });
+    const notes = String(d.notes || "").split("\n").filter(l => l.trim());
+    if (notes.length) content.push({ table: { widths: ["*"], body: [[{ stack: [{ text: "! Notes", bold: true, margin: [0, 0, 0, 4] }, { ul: notes.map(n => ({ text: rt(n) })) }], margin: [6, 6, 6, 6] }]] },
+      layout: lay(new Set()), margin: [0, 0, 0, 20] });
+    if (d.toc) content.push({ toc: { title: { text: "Contents", bold: true, fontSize: 13, margin: [0, 0, 0, 8] } } });
+  }
+  let firstBlock = true;
+  state.groups.forEach((g, gi) => {
+    const breakG = !(firstBlock && !d.cover);
+    content.push({ text: (d.numbering ? gNum(gi) + "   " : "") + strip(g.title), fontSize: 15, bold: true, tocItem: d.toc, tocStyle: { bold: true }, tocMargin: [0, 6, 0, 0], pageBreak: breakG ? "before" : undefined, margin: [0, 0, 0, 12] });
+    firstBlock = false;
+    if (g.overview && g.items.length) content.push(...pdfOverview(g));
+    g.items.forEach((it, ii) => {
+      const breakBefore = ii > 0 ? d.pageBreak : (g.overview && d.pageBreak);
+      content.push(...pdfItem(it, d.numbering ? iNum(gi, ii) : "", { breakBefore }));
+    });
+  });
+  return {
+    pageSize: "A4", pageMargins: [70, 64, 70, 64],
+    info: { title: strip(d.title), creator: "Interface Spec Builder" },
+    defaultStyle: { fontSize: 10, lineHeight: 1.18 },
+    content,
+    footer: (cur) => ({ text: String(cur), alignment: "center", fontSize: 9, margin: [0, 24, 0, 0] }),
+  };
+}
+const fileBase = () => (strip(state.doc.title) || "interface-spec").replace(/[^\w\-]+/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "").toLowerCase() || "interface-spec";
+
+/* ---------- Saving files ---------- */
+const downloadsP = (window.claude && typeof window.claude.use === "function") ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null);
+async function saveFile(filename, data, mime) {
+  const dl = await downloadsP;
+  if (dl) {
+    try { await dl.save({ filename, data }); toast("Saved: " + filename); }
+    catch (e) {
+      if (e && e.code === "declined") toast("Save cancelled");
+      else if (e && e.code === "rate_limited") toast("A save dialog is already open");
+      else toast("Saving failed" + (e && e.message ? ": " + e.message : ""));
+    }
+    return;
+  }
+  const blob = data instanceof Blob ? data : new Blob([data], { type: mime || "application/octet-stream" });
+  const a = h("a", { href: URL.createObjectURL(blob), download: filename }); document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  if (window.claude) toast("Saving is not available in this view");
+}
+
+$("#btnPdf").addEventListener("click", () => {
+  if (!window.pdfMake) { toast("The PDF library did not load. Reload the page and try again."); return; }
+  const btn = $("#btnPdf"); btn.disabled = true;
+  try {
+    pdfMake.createPdf(buildPdf()).getBlob(blob => { btn.disabled = false; saveFile(fileBase() + ".pdf", blob, "application/pdf"); });
+  } catch (e) { btn.disabled = false; toast("PDF error: " + e.message); }
+});
+$("#btnJson").addEventListener("click", () => saveFile(fileBase() + ".json", JSON.stringify(state, null, 2), "application/json"));
+$("#btnMd").addEventListener("click", () => saveFile(fileBase() + ".md", toMarkdown(), "text/markdown"));
+$("#btnImport").addEventListener("click", () => $("#fileIn").click());
+$("#fileIn").addEventListener("change", async e => {
+  const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+  try { const s = JSON.parse(await file.text()); if (!valid(s)) throw new Error("not a project"); state = normalize(s); pendingImport = null; sel = { type: "doc" }; renderAll(); toast("Project opened: " + file.name); }
+  catch (err) { toast("This file is not a valid project (expected JSON from this tool)."); }
+});
+
+/* ---------- Markdown ---------- */
+function toMarkdown() {
+  const d = state.doc; const md = [];
+  const mr = s => splitRed(s).map(r => r.red ? `<span style="color:#d0021b">**${r.t.replace(/\|/g, "\\|")}**</span>` : r.t.replace(/\|/g, "\\|")).join("").replace(/\n/g, "<br>");
+  md.push(`# ${strip(d.title)}`, "");
+  if (d.subtitle) md.push(mr(d.subtitle), "");
+  if (d.meta) md.push(`*${strip(d.meta)}*`, "");
+  const notes = String(d.notes || "").split("\n").filter(l => l.trim());
+  if (notes.length) { md.push("> **! Notes**"); notes.forEach(n => md.push(`> - ${mr(n)}`)); md.push(""); }
+  state.groups.forEach((g, gi) => {
+    md.push(`## ${d.numbering ? gNum(gi) + " " : ""}${strip(g.title)}`, "");
+    if (g.overview && g.items.length) {
+      md.push("| Name | Direction | Short Description | Subsystem |", "|---|---|---|---|");
+      g.items.forEach(it => md.push(`| \`${strip(it.ros || it.name)}\` | ${it.direction} | ${mr(it.short)} | ${mr(it.subsystem)} |`)); md.push("");
+    }
+    g.items.forEach((it, ii) => {
+      md.push(`### ${d.numbering ? iNum(gi, ii) + " " : ""}${strip(it.name)}`, "", `**\`${strip(it.ros)}\`**`, "", `Direction: ${it.direction}  `);
+      if (it.sender || it.receiver) md.push(`${[it.sender && "Sender: " + strip(it.sender), it.receiver && "Receiver: " + strip(it.receiver)].filter(Boolean).join(" \\| ")}  `);
+      if (d.commType) md.push(`Communication type: ${KINDS[it.kind].label}  `);
+      md.push("", "| Parameter Name | Datatype | Description |", "|---|---|---|");
+      KINDS[it.kind].sections.forEach(s => {
+        if (it.kind !== "topic") md.push(`| **${s}** | | |`);
+        (it.fields[s] || []).forEach(f => md.push(`| ${mr(f.name)} | ${mr(f.type)} | ${mr(f.desc)} |`));
+      });
+      md.push("");
+      it.enums.forEach(en => {
+        if (en.showValues) { md.push(`| Classification of ${mr(en.title)} | | |`, "|---|---|---|"); en.rows.forEach(r => md.push(`| ${mr(r.name)} | ${mr(r.value)} | ${mr(r.desc)} |`)); }
+        else { md.push(`| Classification of ${mr(en.title)} | |`, "|---|---|"); en.rows.forEach(r => md.push(`| ${mr(r.name)} | ${mr(r.desc)} |`)); }
+        md.push("");
+        if (en.note && en.note.trim()) md.push(`*<span style="color:#d0021b">**Note:**</span> ${mr(en.note)}*`, "");
+      });
+      it.notes.filter(n => n.trim()).forEach(n => md.push(`*<span style="color:#d0021b">**Note:**</span> ${mr(n)}*`, ""));
+      String(it.description || "").split(/\n\s*\n/).filter(p => p.trim()).forEach(p => md.push(mr(p), ""));
+    });
+  });
+  return md.join("\n");
+}
+
+/* ---------- Open points: questions, decisions and document differences (generic, data-driven) ----------
+   Statuses, ideas and decisions live in state.review, keyed by the point's internal, immutable id.
+   The visible code (e.g. "X3") is a label that must be unique within the project. */
+const emptyPoints = () => ({ title: "Open points", source: "", myTeam: "", sections: [] });
+function examplePoints() {
+  const P = (code, title, ctx, from, by, o) => Object.assign({ id: uid(), code, title, ctx, from, by, block: false, mine: "", other: "", rel: [], kw: [] }, o || {});
+  return {
+    title: "Open points", source: "Example review", myTeam: "Mission Control",
+    sections: [
+      { id: uid(), title: "Example: open questions", sub: "", mineLabel: "", otherLabel: "", items: [
+        P("Q1", "Common heartbeat rate and timeout", "No interface defines how often a heartbeat is sent and when it counts as lost.", ["all teams"], "Review", { block: true }),
+        P("Q2", "Is `ros_lifecycle_state` needed in `navigation/heartbeat`?", "A liveness signal only needs `stamp` and `heartbeat_count`.", ["Mission Control", "Navigation"], "Review"),
+        P("Q3", "Who defines the phases and error codes of `mission/takeoff`?", "The phases must be measurable by the flight controller adapter.", ["FC", "Mission Control"], "Mission Control note"),
+      ] },
+      { id: uid(), title: "Example: document differences", sub: "", mineLabel: "Our document", otherLabel: "GCS document", items: [
+        P("D1", "Field name of the mission state", "", ["GCS"], "Review", { mine: "`status`", other: "`state`" }),
+      ] },
+    ],
+  };
+}
+function normalizePoints(p) {
+  if (!p || typeof p !== "object" || !Array.isArray(p.sections)) p = emptyPoints();
+  p.title ??= "Open points"; p.source ??= ""; p.myTeam ??= "";
+  const used = new Set();
+  p.sections.forEach(s => {
+    s.id ||= uid(); s.title ??= ""; s.sub ??= ""; s.mineLabel ??= ""; s.otherLabel ??= ""; s.items = Array.isArray(s.items) ? s.items : [];
+    s.items.forEach(it => {
+      it.id ||= uid(); it.code = String(it.code ?? "").trim(); it.title ??= ""; it.ctx ??= ""; it.by ??= ""; it.mine ??= ""; it.other ??= ""; it.block = !!it.block;
+      ["from", "rel", "kw"].forEach(k => { it[k] = Array.isArray(it[k]) ? it[k] : []; });
+      if (!it.code || used.has(it.code)) it.code = nextCodeIn(prefixOf(s.title), used);
+      used.add(it.code);
+    });
+  });
+  return p;
+}
+/* Older versions keyed state.review by the visible code. Move those entries to the point id. */
+function migrateReviewKeys(s) {
+  const ids = new Set(); s.points.sections.forEach(sec => sec.items.forEach(p => ids.add(p.id)));
+  s.points.sections.forEach(sec => sec.items.forEach(p => {
+    const r = s.review[p.code];
+    if (r && !ids.has(p.code) && !s.review[p.id]) { s.review[p.id] = r; delete s.review[p.code]; }
+  }));
+}
+
+let rvFilter = "all", rvSearch = "", rvTeam = "", rvEdit = false, rvImport = false;
+const today = () => new Date().toISOString().slice(0, 10);
+const PT = () => state.points;
+const stOf = p => { const r = state.review[p.id]; const s = r && r.status; return s === "done" || s === "discuss" ? s : "open"; };
+const rvGet = p => (state.review[p.id] ||= { status: "open", idea: "", decision: "" });
+function pointEntries() { const out = []; PT().sections.forEach(s => s.items.forEach(p => out.push({ p, s }))); return out; }
+const allPoints = () => pointEntries().map(e => e.p);
+const pointByCode = code => allPoints().find(p => p.code === code);
+const pointById = id => allPoints().find(p => p.id === id);
+function orphanKeys() { const ids = new Set(allPoints().map(p => p.id)); return Object.keys(state.review).filter(k => !ids.has(k)); }
+function adoptOrphan(p) {
+  const r = state.review[p.code];
+  if (r && !pointById(p.code) && !state.review[p.id]) { state.review[p.id] = r; delete state.review[p.code]; return true; }
+  return false;
+}
+function rvCounts() { const c = { open: 0, discuss: 0, done: 0, total: 0 }; allPoints().forEach(p => { c[stOf(p)]++; c.total++; }); return c; }
+const inl = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+const isAllTeams = t => /\ball\b|\balle\b|everyone/i.test(t);
+const isMe = t => { const me = (PT().myTeam || "").trim().toLowerCase(); return !!me && t.trim().toLowerCase() === me; };
+function teamList() {
+  const set = new Set();
+  allPoints().forEach(p => p.from.forEach(t => { t = t.trim(); if (t && !isAllTeams(t) && !isMe(t)) set.add(t); }));
+  return [...set];
+}
+function teamsOf(p) { const all = teamList(); return p.from.some(isAllTeams) ? all : all.filter(t => p.from.some(f => f.trim() === t)); }
+function pointTokens(p) {
+  const t = new Set((p.kw || []).map(k => k.trim()).filter(Boolean));
+  [p.title, p.ctx, p.mine, p.other].forEach(x => String(x || "").replace(/`([^`]+)`/g, (_, m) => { t.add(m.trim()); return ""; }));
+  return [...t];
+}
+function relatedPoints(p) {
+  const out = new Set();
+  (p.rel || []).forEach(c => { const q = pointByCode(c); if (q && q !== p) out.add(q); });
+  allPoints().forEach(q => { if (q !== p && (q.rel || []).includes(p.code)) out.add(q); });
+  return [...out];
+}
+function ring(c, size) {
+  const r = size / 2 - (size > 30 ? 5 : 2.5), C = 2 * Math.PI * r, k = c.total ? C / c.total : 0, mid = size / 2;
+  const dn = (c.done * k).toFixed(2), dd = (c.discuss * k).toFixed(2);
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true"><circle cx="${mid}" cy="${mid}" r="${r}" class="r-bg"/>` +
+    `<circle cx="${mid}" cy="${mid}" r="${r}" class="r-dis" stroke-dasharray="${dd} ${C}" stroke-dashoffset="${-dn}" transform="rotate(-90 ${mid} ${mid})"/>` +
+    `<circle cx="${mid}" cy="${mid}" r="${r}" class="r-done" stroke-dasharray="${dn} ${C}" transform="rotate(-90 ${mid} ${mid})"/></svg>`;
+}
+function itemTokens(it) {
+  const t = new Set(); const add = v => { const s = strip(v).trim(); if (s) t.add(s); };
+  add(it.ros); Object.values(it.fields || {}).forEach(a => a.forEach(f => add(f.name)));
+  (it.enums || []).forEach(en => { add(en.title); en.rows.forEach(r => add(r.name)); });
+  return t;
+}
+function itemsFor(tokens) {
+  const out = []; if (!tokens || !tokens.length) return out;
+  state.groups.forEach(g => g.items.forEach(it => { const t = itemTokens(it); if (tokens.some(k => t.has(k))) out.push({ g, it }); }));
+  return out;
+}
+const pointsFor = it => { const t = itemTokens(it); return allPoints().filter(p => pointTokens(p).some(k => t.has(k))); };
+/* Returns false (and keeps the old code) if the new code is empty or already used. */
+function renameCode(p, code) {
+  code = String(code).trim(); const old = p.code;
+  if (code === old) return true;
+  if (!code) { toast("The ID must not be empty."); return false; }
+  const other = pointByCode(code);
+  if (other && other !== p) { toast(`The ID “${code}” is already used. IDs must be unique.`); return false; }
+  allPoints().forEach(q => { q.rel = (q.rel || []).map(c => c === old ? code : c); });
+  p.code = code;
+  adoptOrphan(p);
+  return true;
+}
+function nextCodeIn(prefix, used) { let n = 1; while (used.has(prefix + n)) n++; return prefix + n; }
+const nextCode = prefix => nextCodeIn(prefix, new Set(allPoints().map(p => p.code)));
+const prefixOf = title => (String(title).replace(/^example:\s*/i, "").match(/[A-Za-z]/) || ["P"])[0].toUpperCase();
+
+function reviewNav() {
+  const c = rvCounts();
+  return [h("h4", null, "Open points"),
+    h("button", { class: "nav-item", "aria-current": String(sel.type === "review"), onclick: () => select({ type: "review" }) },
+      h("span", { class: "rv-ring", html: ring(c, 22) }),
+      h("span", { class: "t" }, h("b", null, PT().title || "Open points"), h("small", null, c.total ? `${c.done}/${c.total} done · ${c.discuss} in disc.` : "No points yet")))];
+}
+function setStatus(p, v) {
+  const r = rvGet(p); const was = r.status; r.status = v;
+  if (v === "done" && !r.decision && r.idea) r.decision = r.idea;
+  renderAll();
+  if (v === "done" && was !== "done") { const c = rvCounts(); toast(c.done === c.total ? "All done. Nice work!" : `${p.code} done · ${c.total - c.done} still open`); }
+}
+function tickBtn(p, st, reopenTo) {
+  return h("button", { type: "button", class: "tick", "aria-pressed": String(st === "done"), title: st === "done" ? "Reopen" : "Mark as done", "aria-label": (st === "done" ? "Reopen: " : "Mark as done: ") + p.code,
+    html: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg>',
+    onclick: () => setStatus(p, st === "done" ? reopenTo : "done") });
+}
+function rvText(p, key, ph, rows) {
+  const r = rvGet(p); const ta = h("textarea", { id: `rv-${key}-${p.id}`, rows: rows || 2 });
+  ta.value = r[key] || ""; ta.placeholder = ph;
+  ta.addEventListener("input", () => { r[key] = ta.value; changed(); });
+  return ta;
+}
+function listInput(obj, key, ph, id) {
+  const el = h("input", { type: "text", id }); el.value = (obj[key] || []).join(", "); el.placeholder = ph;
+  el.addEventListener("input", () => { obj[key] = el.value.split(",").map(s => s.trim()).filter(Boolean); changed(); });
+  el.addEventListener("change", renderAll);
+  return el;
+}
+const linkChip = ({ g, it }) => h("button", { type: "button", class: "link-chip", title: "Open interface", onclick: () => select({ type: "item", gid: g.id, iid: it.id }) },
+  h("span", { class: "kind " + it.kind }, it.kind[0].toUpperCase()), strip(it.name) || "Unnamed");
+const idChip = p => h("button", { type: "button", class: "link-chip mono", "data-st": stOf(p), onclick: () => select({ type: "review", focus: p.id }) }, h("span", { class: "sdot" }), p.code);
+
+function pointCard(p, s) {
+  const st = stOf(p); const links = itemsFor(pointTokens(p)); const rel = relatedPoints(p);
+  const hasCmp = p.mine || p.other;
+  const arr = s.items, k = arr.indexOf(p);
+  let body;
+  if (rvEdit) {
+    const code = h("input", { type: "text", id: `pt-code-${p.id}`, class: "mono", "aria-label": "ID" }); code.value = p.code; code.placeholder = "ID";
+    code.addEventListener("change", () => { if (!renameCode(p, code.value)) code.value = p.code; renderAll(); });
+    body = [
+      h("div", { class: "qc-top" }, h("div", { style: "width:90px" }, code),
+        checkbox(p, "block", "settle first", renderAll),
+        h("span", { style: "flex:1" }),
+        h("button", { class: "icon", title: "Move up", html: ICON.up, onclick: () => move(arr, k, -1) }),
+        h("button", { class: "icon", title: "Move down", html: ICON.down, onclick: () => move(arr, k, 1) }),
+        armedBtn("icon del", ICON.del, "Delete point (click twice)", () => { arr.splice(k, 1); delete state.review[p.id]; renderAll(); })),
+      h("div", { class: "grid" },
+        labeled("Question / item", bound(p, "title", { multi: true, rows: 1, ph: "What needs to be decided?" }), "full"),
+        labeled("Context", bound(p, "ctx", { multi: true, rows: 2, ph: "Background. Names in `backticks` link to matching interfaces." }), "full"),
+        labeled("Answer from (comma-separated)", listInput(p, "from", "Team A, Team B", `pt-from-${p.id}`)),
+        labeled("Raised by", bound(p, "by", { ph: "Review" })),
+        labeled(s.mineLabel || "Your document says", bound(p, "mine", { multi: true, rows: 1, ph: "optional" })),
+        labeled(s.otherLabel || "Other document says", bound(p, "other", { multi: true, rows: 1, ph: "optional" })),
+        labeled("Related points (IDs)", listInput(p, "rel", "Q2, D1", `pt-rel-${p.id}`)),
+        labeled("Extra names to link", listInput(p, "kw", "topic/name, FIELD_NAME", `pt-kw-${p.id}`))),
+    ];
+  } else {
+    body = [
+      h("div", { class: "qc-top" },
+        h("span", { class: "qid" }, p.code),
+        p.block ? h("span", { class: "chip block", title: "Blocks other points" }, "settle first") : null,
+        p.from.map(t => h("span", { class: "chip" + (isMe(t) ? " me" : "") }, t)),
+        p.by ? h("span", { class: "chip ghost" }, p.by) : null,
+        tickBtn(p, st, rvGet(p).idea ? "discuss" : "open")),
+      h("h4", { class: "qq", html: inl(p.title) }),
+      p.ctx ? h("p", { class: "qctx", html: inl(p.ctx) }) : null,
+      hasCmp ? h("div", { class: "cmp" },
+        h("div", { class: "ch mine" }, s.mineLabel || "Your document"), h("div", { class: "ch" }, s.otherLabel || "Other document"),
+        h("div", { class: "mine", html: inl(p.mine || "–") }), h("div", { html: inl(p.other || "–") })) : null,
+      links.length || rel.length ? h("div", { class: "qlinks" },
+        links.length ? [h("span", null, "Affects:"), links.map(linkChip)] : null,
+        rel.length ? [h("span", null, (links.length ? "· " : "") + "Related:"), rel.map(idChip)] : null) : null,
+    ];
+  }
+  return h("article", { class: "qc", id: "qc-" + p.id, "data-st": st }, ...body,
+    h("div", { class: "qwork" },
+      h("div", null, seg([["open", "Open"], ["discuss", "In discussion"], ["done", "Decided"]], st, v => setStatus(p, v))),
+      labeled("My idea / notes", rvText(p, "idea", "What do you propose? Who do you need to talk to?", 2)),
+      st === "done" ? labeled("Decision (goes into the “Decision” column)", rvText(p, "decision", "What was decided?", 2)) : null));
+}
+function rvMatches(p) {
+  if (rvFilter !== "all" && stOf(p) !== rvFilter) return false;
+  if (rvTeam && !teamsOf(p).includes(rvTeam)) return false;
+  if (!rvSearch.trim()) return true;
+  const r = state.review[p.id] || {};
+  const hay = [p.code, p.title, p.ctx, p.mine, p.other, p.by, p.from.join(" "), r.idea, r.decision].join(" ").toLowerCase();
+  return rvSearch.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
+}
+function addPoint(s) {
+  const p = { id: uid(), code: nextCode(prefixOf(s.title)), title: "", ctx: "", from: [], by: "", block: false, mine: "", other: "", rel: [], kw: [] };
+  s.items.push(p); rvEdit = true; renderAll();
+  requestAnimationFrame(() => { const el = document.getElementById(`in-${p.id}-title`); if (el) { el.scrollIntoView({ block: "center" }); el.focus(); } });
+}
+function addSection() {
+  const s = { id: uid(), title: "New section", sub: "", mineLabel: "", otherLabel: "", items: [] };
+  PT().sections.push(s); rvEdit = true; renderAll();
+  requestAnimationFrame(() => { const el = document.getElementById(`in-${s.id}-title`); if (el) { el.scrollIntoView({ block: "center" }); el.focus(); el.select(); } });
+}
+function fillReviewList(list) {
+  list.textContent = ""; let shown = 0;
+  const secs = PT().sections;
+  secs.forEach((s, si) => {
+    const items = rvEdit ? s.items : s.items.filter(rvMatches);
+    if (!items.length && !rvEdit) return;
+    const done = s.items.filter(i => stOf(i) === "done").length;
+    if (rvEdit) {
+      const title = bound(s, "title", { ph: "Section title" }); title.classList.add("hz-name");
+      list.append(h("div", { class: "card", style: "margin:18px 0 10px" },
+        h("div", { class: "hz-top" }, title,
+          h("button", { class: "icon", title: "Move up", html: ICON.up, onclick: () => move(secs, si, -1) }),
+          h("button", { class: "icon", title: "Move down", html: ICON.down, onclick: () => move(secs, si, 1) }),
+          armedBtn("icon del", ICON.del, "Delete section with all its points (click twice)", () => { s.items.forEach(p => delete state.review[p.id]); secs.splice(si, 1); renderAll(); })),
+        h("div", { class: "grid", style: "margin-top:8px" },
+          labeled("Subtitle", bound(s, "sub", { ph: "optional" }), "full"),
+          labeled("Label of your document (comparison)", bound(s, "mineLabel", { ph: "e.g. Our document" })),
+          labeled("Label of the other document", bound(s, "otherLabel", { ph: "e.g. Team B document" })))));
+    } else {
+      list.append(h("div", { class: "rv-sec" }, h("span", null, s.title || "Untitled"), s.sub ? h("span", { class: "c" }, "· " + s.sub) : null, h("span", { class: "c" }, `${done}/${s.items.length}`)));
+    }
+    items.forEach(p => { list.append(pointCard(p, s)); shown++; });
+    if (rvEdit) list.append(h("div", { style: "margin:-2px 0 6px" }, h("button", { class: "btn ghost small", onclick: () => addPoint(s) }, "+ Point")));
+  });
+  if (rvEdit) list.append(h("div", { style: "margin-top:12px" }, h("button", { class: "btn", onclick: addSection }, "+ Section")));
+  else if (!shown && allPoints().length) list.append(h("div", { class: "rv-empty" }, rvFilter === "done" && !rvSearch && !rvTeam ? "Nothing marked as done yet." : "No points match this filter.",
+    h("div", { style: "margin-top:8px" }, h("button", { class: "btn small", onclick: () => { rvFilter = "all"; rvSearch = ""; rvTeam = ""; renderEditor(); } }, "Reset filter"))));
+}
+
+/* --- Markdown import: headings become sections, table rows become points --- */
+function mdCells(line) {
+  let t = line.trim(); if (t.startsWith("|")) t = t.slice(1); if (t.endsWith("|") && !t.endsWith("\\|")) t = t.slice(0, -1);
+  return t.split(/(?<!\\)\|/).map(c => c.trim().replace(/\\\|/g, "|"));
+}
+const mdIsSep = l => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l);
+function parseMarkdownPoints(text) {
+  const lines = String(text).split(/\r?\n/); const sections = []; let heading = "Imported"; let i = 0;
+  while (i < lines.length) {
+    const l = lines[i]; const hm = l.match(/^#{1,6}\s+(.*)$/);
+    if (hm) { heading = hm[1].replace(/[#*_`]/g, "").trim(); i++; continue; }
+    if (l.trim().startsWith("|") && i + 1 < lines.length && mdIsSep(lines[i + 1])) {
+      const raw = mdCells(l); i += 2; const rows = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) { rows.push(mdCells(lines[i])); i++; }
+      const sec = mdTableToSection(heading, raw, rows); if (sec.items.length) sections.push(sec);
+      continue;
+    }
+    i++;
+  }
+  return sections;
+}
+function mdTableToSection(title, raw, rows) {
+  const head = raw.map(x => x.toLowerCase().replace(/[*_`]/g, "").trim());
+  const find = names => {
+    for (const n of names) { const k = head.findIndex(x => x === n); if (k >= 0) return k; }
+    for (const n of names) { if (n === "answer") continue; const k = head.findIndex(x => x.startsWith(n)); if (k >= 0) return k; }
+    return -1;
+  };
+  const ci = find(["id", "#", "nr", "no."]);
+  let ti = find(["question", "item", "fix", "point", "topic", "issue", "title", "frage", "punkt"]);
+  const xi = find(["context", "details", "description", "problem", "kontext", "document"]);
+  const fi = find(["answer from", "owner", "responsible", "assignee", "who", "team"]);
+  const bi = find(["raised by", "source", "origin", "quelle"]);
+  const di = find(["decision", "answer", "entscheidung"]);
+  const used = new Set([ci, ti, xi, fi, bi, di].filter(x => x >= 0));
+  if (ti < 0) { ti = head.findIndex((_, k) => !used.has(k)); used.add(ti); }
+  const rest = head.map((_, k) => k).filter(k => !used.has(k));
+  const cmp = rest.length >= 2 ? rest.slice(0, 2) : null;
+  const sec = { id: uid(), title, sub: "", mineLabel: cmp ? raw[cmp[0]] : "", otherLabel: cmp ? raw[cmp[1]] : "", items: [] };
+  const idList = /^[A-Z]{1,3}\d+([–-][A-Z]{0,3}\d+)?(\s*,\s*[A-Z]{1,3}\d+([–-][A-Z]{0,3}\d+)?)*$/;
+  if (ci < 0 && rows.length && rows.every(r => idList.test((r[ti] || "").trim()))) return sec;   // summary table like "Team | Questions"
+  rows.forEach(r => {
+    const g = x => (x >= 0 && x < r.length ? r[x] : "");
+    if (!g(ti) && !g(ci)) return;
+    sec.items.push({ id: uid(), code: g(ci).replace(/[*`]/g, "").trim(), title: g(ti), ctx: g(xi),
+      from: g(fi).split(/,|\/|\band\b|\bund\b/).map(x => x.trim().replace(/^led by\s+/i, "")).filter(Boolean), by: g(bi), block: false,
+      mine: cmp ? g(cmp[0]) : "", other: cmp ? g(cmp[1]) : "", rel: [], kw: [], _decision: g(di) });
+  });
+  return sec;
+}
+function importMarkdown(text) {
+  const secs = parseMarkdownPoints(text);
+  const existing = new Set(allPoints().map(p => p.code));
+  let added = 0, skipped = 0, restored = 0;
+  secs.forEach(s => {
+    const keep = [];
+    s.items.forEach(p => {
+      if (p.code && existing.has(p.code)) { skipped++; return; }
+      if (!p.code) p.code = nextCodeIn(prefixOf(s.title), existing);
+      existing.add(p.code);
+      const dec = (p._decision || "").trim(); delete p._decision;
+      if (state.review[p.code] && !state.review[p.id]) { state.review[p.id] = state.review[p.code]; delete state.review[p.code]; restored++; }
+      else if (dec) { const r = rvGet(p); r.status = "done"; r.decision = dec; }
+      keep.push(p); added++;
+    });
+    s.items = keep;
+    if (keep.length) PT().sections.push(s);
+  });
+  renderAll();
+  const parts = [];
+  if (added) parts.push(`Imported ${added} point(s)`);
+  if (restored) parts.push(`restored ${restored} saved status(es)`);
+  if (skipped) parts.push(`skipped ${skipped} with an existing ID`);
+  toast(parts.length ? parts.join(", ") : "No tables found. Expected Markdown tables with a header row.");
+  return added;
+}
+function importCard() {
+  const ta = h("textarea", { id: "md-import", rows: 8, class: "mono", placeholder: "## Section title\n\n| ID | Question | Context | Answer from | Raised by | Decision |\n|---|---|---|---|---|---|\n| Q1 | Which frame is used? | … | Team A, Team B | Review | |" });
+  const file = h("input", { type: "file", id: "md-file", accept: ".md,.markdown,.txt,text/markdown,text/plain", hidden: true });
+  file.addEventListener("change", async () => { const f = file.files[0]; file.value = ""; if (!f) return; ta.value = await f.text(); toast("Loaded " + f.name); });
+  return h("div", { class: "card" }, h("h3", null, "Import from Markdown", h("span", { class: "sp" }),
+      h("button", { class: "btn ghost small", onclick: () => { rvImport = false; renderEditor(); } }, "Close")),
+    h("p", { class: "hint", style: "margin:0 0 8px" }, "Paste a review or question list. Headings become sections, table rows become points. Recognised columns: ID, Question/Item, Context, Answer from/Owner, Raised by, Decision. Two remaining columns become a document comparison. Rows whose ID already exists are skipped."),
+    ta, file,
+    h("div", { class: "danger-zone", style: "margin-top:8px" },
+      h("button", { class: "btn primary", onclick: () => { if (importMarkdown(ta.value)) { rvImport = false; renderEditor(); } } }, "Import"),
+      h("button", { class: "btn", onclick: () => file.click() }, "Load .md file")));
+}
+
+function reviewBoard() {
+  const P = PT(); const c = rvCounts(); const teams = teamList(); const orphans = orphanKeys();
+  const openBy = t => allPoints().filter(p => stOf(p) !== "done" && teamsOf(p).includes(t)).length;
+  const entries = allPoints();
+  const blocker = entries.find(p => p.block && stOf(p) !== "done");
+  const nextUp = entries.find(p => stOf(p) === "open");
+  const list = h("div", { id: "rv-list" });
+  const search = h("input", { type: "text", id: "rv-search", placeholder: "Search: name, ID, team …" }); search.value = rvSearch;
+  search.addEventListener("input", () => { rvSearch = search.value; fillReviewList(list); });
+  fillReviewList(list);
+  const head = h("div", { class: "ed-head" }, h("div", null,
+      h("div", { class: "crumb" }, P.source ? "Open points · " + P.source : "Open points"),
+      h("h2", null, P.title || "Open points")),
+    h("div", { class: "actions" },
+      h("button", { class: "btn" + (rvEdit ? " primary" : ""), "aria-pressed": String(rvEdit), onclick: () => { rvEdit = !rvEdit; renderEditor(); } }, rvEdit ? "Done editing" : "Edit points"),
+      h("button", { class: "btn", onclick: () => { rvImport = !rvImport; renderEditor(); } }, "Import"),
+      entries.length ? h("button", { class: "btn", onclick: () => saveFile(slug(P.title || "open_points") + "_answers.md", answersMarkdown(), "text/markdown") }, "Answers as Markdown") : null));
+  const settings = rvEdit ? h("div", { class: "card" }, h("h3", null, "Board"),
+    h("div", { class: "grid" },
+      labeled("Title", bound(P, "title", { ph: "Open points" })),
+      labeled("Your team (highlighted, excluded from “Open with”)", bound(P, "myTeam", { ph: "e.g. Mission Control" })),
+      labeled("Source", bound(P, "source", { ph: "e.g. REVIEW.md of 21 Oct" }), "full"))) : null;
+  const orphanNote = orphans.length ? h("div", { class: "callout" },
+    h("span", null, h("b", null, `${orphans.length} saved status(es) without a point. `),
+      "They come from an earlier version and are kept until a point with the matching ID exists. Import the list with these IDs to restore them: ",
+      h("code", { class: "mono" }, orphans.slice(0, 8).join(", ") + (orphans.length > 8 ? " …" : ""))),
+    armedBtn("btn ghost small", "Discard", "Deletes these saved statuses", () => { orphans.forEach(k => delete state.review[k]); renderAll(); }, "Really discard?")) : null;
+  const parts = [head, rvImport ? importCard() : null, orphanNote, settings];
+  if (!entries.length && !rvEdit) {
+    parts.push(h("div", { class: "rv-empty", style: "padding:32px 20px" },
+      h("div", { style: "font-weight:600;color:var(--fg);margin-bottom:6px" }, "No open points yet"),
+      "Import a review or question list from Markdown, or add sections and points by hand.",
+      h("div", { class: "danger-zone", style: "justify-content:center;margin-top:12px" },
+        h("button", { class: "btn primary", onclick: () => { rvImport = true; renderEditor(); } }, "Import Markdown"),
+        h("button", { class: "btn", onclick: addSection }, "Add a section"))));
+    return parts;
+  }
+  if (!rvEdit) parts.push(
+    h("div", { class: "rv-hero" },
+      h("span", { class: "rv-ring", html: ring(c, 64) }),
+      h("div", { class: "rv-big" }, h("b", null, `${c.done}/${c.total}`), h("span", null, "done")),
+      h("div", { class: "rv-side" },
+        h("div", { class: "meter", role: "img", "aria-label": `${c.done} of ${c.total} done, ${c.discuss} in discussion` },
+          h("span", { class: "m-done", style: `width:${c.total ? c.done / c.total * 100 : 0}%` }),
+          h("span", { class: "m-discuss", style: `width:${c.total ? c.discuss / c.total * 100 : 0}%` })),
+        h("div", { class: "legend" },
+          h("span", null, h("span", { class: "sdot done" }), `${c.done} done`),
+          h("span", null, h("span", { class: "sdot discuss" }), `${c.discuss} in discussion`),
+          h("span", null, h("span", { class: "sdot" }), `${c.open} open`)),
+        teams.length ? h("div", { class: "teams" }, h("span", null, "Open with:"),
+          teams.map(t => h("button", { type: "button", class: "team-btn", "aria-pressed": String(rvTeam === t), title: `Show only points with ${t}`,
+            onclick: () => { rvTeam = rvTeam === t ? "" : t; renderEditor(); } }, `${t} ${openBy(t)}`))) : null)),
+    blocker || nextUp ? h("div", { class: "callout" },
+      h("span", null, blocker ? h("b", null, "First: ") : h("b", null, "Next up: "), (blocker || nextUp).code + " · ", h("span", { html: inl((blocker || nextUp).title) })),
+      idChip(blocker || nextUp)) : null,
+    h("div", { class: "toolbar" },
+      seg([["all", `All ${c.total}`], ["open", `Open ${c.open}`], ["discuss", `In discussion ${c.discuss}`], ["done", `Done ${c.done}`]], rvFilter, v => { rvFilter = v; renderEditor(); }),
+      search));
+  parts.push(list);
+  return parts;
+}
+const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "file";
+function relatedCard(it) {
+  const pts = pointsFor(it); if (!pts.length) return null;
+  const open = pts.filter(p => stOf(p) !== "done").length;
+  return h("div", { class: "card" },
+    h("h3", null, "Open points", h("span", { class: "sp" }), h("span", { class: "hint", style: "text-transform:none;letter-spacing:0;font-weight:400" }, open ? `${open} of ${pts.length} open` : "all done")),
+    h("div", { class: "rel-list" }, pts.map(p => h("button", { type: "button", class: "rel-row", "data-st": stOf(p), onclick: () => select({ type: "review", focus: p.id }) },
+      h("span", { class: "sdot" }), h("span", { class: "qid" }, p.code), h("span", { class: "rel-t", html: inl(p.title) }), h("span", { class: "go" }, "open →")))));
+}
+function decisionText(p) {
+  const r = state.review[p.id] || {}; const st = stOf(p);
+  if (st === "done") return { kind: "done", text: r.decision || r.idea || "" };
+  if (r.idea) return { kind: "prop", text: r.idea };
+  return { kind: "open", text: "" };
+}
+function answersHTML() {
+  const P = PT(); const c = rvCounts();
+  if (!c.total) return '<p style="color:#666">No open points yet.</p>';
+  const cell = p => { const d = decisionText(p);
+    if (d.kind === "done") return d.text ? esc(d.text).replace(/\n/g, "<br>") : '<span class="open">decided</span>';
+    if (d.kind === "prop") return `<span class="prop">Proposal: ${esc(d.text).replace(/\n/g, "<br>")}</span>`;
+    return '<span class="open">open</span>'; };
+  let html = `<h2 style="margin-bottom:2px">${esc(P.title || "Open points")} — Answers</h2><p class="small">Status ${esc(today())} · ${c.done} of ${c.total} done · ${c.discuss} in discussion${P.source ? " · " + esc(P.source) : ""}</p>`;
+  P.sections.forEach(s => {
+    if (!s.items.length) return;
+    html += `<p class="ttl" style="margin:14px 0 6px">${esc(s.title)}</p><table><tbody><tr class="hd thick"><th style="width:10%">ID</th><th style="width:45%">Point</th><th>Decision</th></tr>`;
+    s.items.forEach(p => html += `<tr><td>${esc(p.code)}</td><td>${inl(p.title)}</td><td>${cell(p)}</td></tr>`);
+    html += "</tbody></table>";
+  });
+  return html;
+}
+function answersMarkdown() {
+  const P = PT(); const c = rvCounts(); const q = s => String(s ?? "").replace(/\|/g, "\\|").replace(/\n+/g, "<br>");
+  const label = { open: "open", discuss: "in discussion", done: "decided" };
+  const md = [`# ${P.title || "Open points"} — Answers`, "", `Status ${today()}: ${c.done} of ${c.total} done, ${c.discuss} in discussion.`, ""];
+  if (P.source) md.push(`Source: ${P.source}`, "");
+  P.sections.forEach(s => {
+    if (!s.items.length) return;
+    const cmp = s.items.some(i => i.mine || i.other);
+    md.push(`## ${s.title}`, "");
+    if (s.sub) md.push(`*${s.sub}*`, "");
+    md.push(cmp ? `| ID | Point | ${q(s.mineLabel || "Your document")} | ${q(s.otherLabel || "Other document")} | Status | Decision / note |` : "| ID | Point | Status | Decision |",
+      cmp ? "|---|---|---|---|---|---|" : "|---|---|---|---|");
+    s.items.forEach(i => { const d = decisionText(i); const txt = d.kind === "prop" ? "Proposal: " + d.text : d.text;
+      md.push(cmp ? `| ${q(i.code)} | ${q(i.title)} | ${q(i.mine)} | ${q(i.other)} | ${label[stOf(i)]} | ${q(txt)} |` : `| ${q(i.code)} | ${q(i.title)} | ${label[stOf(i)]} | ${q(txt)} |`); });
+    md.push("");
+  });
+  return md.join("\n");
+}
+
+/* ---------- Safety concept (generic): hazards, escalation ladder, simulator ---------- */
+const GENERIC_RULES = [
+  "Every active hazard demands a minimum level. The highest demanded level is executed.",
+  "A higher level includes the lower ones. Nothing is queued.",
+  "While a reaction is running, it is never downgraded. Exception: levels that may end on their own.",
+  "If a level is not possible (a prerequisite is missing), the next higher possible level is chosen.",
+  "If a running reaction fails, at least the next higher level is chosen.",
+  "If an authority with higher precedence has taken over, this module stands down and only reports.",
+  "A hazard only counts once it has persisted for its onset time, and only counts as cleared after its clear time.",
+];
+function minimalSafety() {
+  return {
+    title: "Safety concept", statusTopic: "", actionPrefix: "ACTION_", rules: GENERIC_RULES.slice(), scenarios: [],
+    caps: [{ id: "ctrl", name: "Control interface reachable", desc: "The safety module can command the system." },
+      { id: "pos", name: "Position estimate", desc: "Position is known well enough to hold or return." }],
+    levels: [
+      { id: "none", name: "NONE", action: "", needs: [], desc: "No reaction, monitor only.", clearable: false },
+      { id: "hold", name: "HOLD", action: "", needs: ["ctrl", "pos"], desc: "Hold the current state.", clearable: true },
+      { id: "return", name: "RETURN", action: "", needs: ["ctrl", "pos"], desc: "Return to a safe home position.", clearable: false },
+      { id: "stop", name: "SAFE_STOP", action: "", needs: ["ctrl"], desc: "Stop in a safe way at the current position.", clearable: false },
+      { id: "estop", name: "EMERGENCY_STOP", action: "", needs: ["ctrl"], desc: "Stop as fast as possible.", clearable: false }],
+    authority: [{ id: uid(), name: "Operator", self: false }, { id: uid(), name: "Safety module", self: true }, { id: uid(), name: "Mission logic", self: false }],
+    hazards: [],
+  };
+}
+function exampleSafety() {
+  const C = (id, name, desc) => ({ id, name, desc });
+  const L = (id, name, action, needs, desc, clearable) => ({ id, name, action, needs, desc, clearable: !!clearable });
+  const H = (key, cat, name, detect, source, level, o) => Object.assign({ id: uid(), key, cat, name, detect, source, level, on: "1", off: "3", escAfter: "", escTo: "", kills: [], why: "", status: "proposed" }, o || {});
+  const s = {
+    title: "Safety concept", statusTopic: "safety/status", actionPrefix: "ACTION_", rules: GENERIC_RULES.slice(), scenarios: [],
+    caps: [C("fci", "FCI reachable", "Safety can send actions to the FCI."), C("gps", "GPS position", "3D fix, position estimate valid."),
+      C("home", "Home position known", "PX4 knows the home position."), C("energy", "Battery sufficient for return", "Remaining energy covers the distance back to the home position.")],
+    levels: [L("none", "NONE", "", [], "No reaction, monitor only."), L("hold", "HOLD", "fci/hold_position", ["fci", "gps"], "Hold position.", true),
+      L("rtl", "RTL", "fci/rtl", ["fci", "gps", "home", "energy"], "Return to the home position and land."), L("land", "LAND", "fci/land", ["fci"], "Land at the current position."),
+      L("eland", "EMERGENCY_LAND", "fci/emergency_land", ["fci"], "Emergency landing, as fast as possible.")],
+    authority: [{ id: uid(), name: "Pilot (RC)", self: false }, { id: uid(), name: "PX4 failsafe", self: false }, { id: uid(), name: "Safety", self: true }, { id: uid(), name: "Mission Control", self: false }],
+    hazards: [
+      H("mc_lost", "Subsystems", "MC lost", "No heartbeat for > 2 s", "mission/heartbeat", "rtl", { why: "Flying still works, but nobody controls the mission." }),
+      H("nav_lost", "Subsystems", "Navigation lost", "No heartbeat for > 2 s", "navigation/heartbeat", "hold", { escAfter: "10", escTo: "rtl", why: "Possibly just a restart, so wait first." }),
+      H("fci_lost", "Subsystems", "FCI lost", "No status for > 1 s", "fci/vehicle_status", "land", { kills: ["fci"], why: "Safety can no longer act. PX4 takes over (offboard loss)." }),
+      H("gcs_lost", "Communication", "GCS link lost", "Reported by MC", "–", "hold", { escAfter: "30", escTo: "rtl", status: "open", why: "To be decided: may the drone keep flying without an operator?" }),
+      H("bat_low", "Energy", "Battery low", "battery_percent < 30", "fci/vehicle_status", "rtl"),
+      H("bat_crit", "Energy", "Battery critical", "battery_percent < 15", "fci/vehicle_status", "land"),
+      H("bat_return", "Energy", "Battery insufficient for return", "Distance × consumption > remaining energy", "fci/vehicle_status, fci/position", "rtl", { kills: ["energy"], status: "open", why: "Advanced, for later." }),
+      H("gps_bad", "Position", "GPS degraded", "hdop > 2.5", "fci/vehicle_status", "hold"),
+      H("gps_lost", "Position", "GPS lost", "gps_fix_type < 3", "fci/vehicle_status", "hold", { kills: ["gps"], why: "Without GPS there is no hold and no RTL, so LAND results." }),
+      H("esc_hot", "Vehicle", "ESC overheating", "esc_temperature_max_c > 90", "fci/vehicle_status", "rtl", { status: "open", why: "Only if the ESCs provide telemetry." }),
+      H("geofence", "Environment", "Geofence violated", "Position outside the zone", "fci/position", "rtl", { status: "open", why: "If there is a geofence." }),
+      H("wind", "Environment", "Strong wind", "PX4 wind estimate > limit", "–", "rtl", { status: "open" }),
+      H("landing_zone", "Environment", "Landing zone occupied", "Sensor?", "–", "hold", { status: "open", why: "Depends on whether a downward-facing sensor is available." }),
+    ],
+  };
+  s.scenarios = droneScenarios(s);
+  return s;
+}
+function droneScenarios(s) {
+  const hz = keys => s.hazards.filter(x => keys.includes(x.key)).map(x => x.id);
+  const lv = name => (s.levels.find(l => l.name === name) || s.levels[0]).id;
+  const pilot = s.authority.find(a => /pilot/i.test(a.name));
+  const S = (name, keys, run, o) => Object.assign({ id: uid(), name, active: hz(keys), running: lv(run || "NONE"), failed: false, escalated: false, standdown: [] }, o || {});
+  return [
+    S("Battery low + GPS lost", ["bat_low", "gps_lost"]),
+    S("RTL running, battery turns critical", ["bat_low", "bat_crit"], "RTL"),
+    S("RTL running, battery ok again", [], "RTL"),
+    S("HOLD running, Navigation back", [], "HOLD"),
+    S("Navigation lost, 10 s later", ["nav_lost"], "HOLD", { escalated: true }),
+    S("RTL fails", ["mc_lost"], "RTL", { failed: true }),
+    S("FCI lost", ["fci_lost"]),
+    S("Pilot takes over", ["bat_low"], "RTL", { standdown: pilot ? [pilot.id] : [] }),
+  ];
+}
+function normalizeSafety(s) {
+  if (!s || typeof s !== "object") return minimalSafety();
+  const m = minimalSafety();
+  s.caps = Array.isArray(s.caps) ? s.caps : m.caps;
+  s.levels = Array.isArray(s.levels) && s.levels.length ? s.levels : m.levels;
+  s.authority = Array.isArray(s.authority) ? s.authority : m.authority;
+  s.hazards = Array.isArray(s.hazards) ? s.hazards : [];
+  s.title ??= "Safety concept"; s.actionPrefix ??= "ACTION_";
+  s.rules = Array.isArray(s.rules) ? s.rules : GENERIC_RULES.slice();
+  s.caps.forEach(c => c.id ||= uid());
+  s.levels.forEach(l => { l.id ||= uid(); l.needs ||= []; });
+  s.authority.forEach(a => { a.id ||= uid(); a.self = !!a.self; });
+  if (!s.authority.some(a => a.self)) { const me = s.authority.find(a => /safety/i.test(a.name)); if (me) me.self = true; }
+  s.hazards.forEach(x => {
+    x.id ||= uid(); x.kills ||= []; x.status ||= "proposed";
+  });
+  s.statusTopic ??= "";
+  if (!Array.isArray(s.scenarios)) s.scenarios = [];
+  s.scenarios.forEach(sc => { sc.id ||= uid(); sc.active ||= []; sc.standdown ||= []; });
+  return s;
+}
+let safetyTab = "catalog";
+let sim = { active: new Set(), running: "", failed: false, escalated: false, standdown: new Set() };
+const SP = () => state.safety;
+const selfAuth = () => SP().authority.find(a => a.self);
+const selfName = () => (selfAuth() || { name: "Safety" }).name || "Safety";
+const lvIdx = id => Math.max(0, SP().levels.findIndex(l => l.id === id));
+const lvColor = i => { const n = SP().levels.length; const pal = ["var(--muted)", "var(--st-discuss)", "var(--st-open)", "var(--action)", "var(--red)"]; return pal[i <= 0 ? 0 : Math.min(4, Math.max(1, Math.round(i / Math.max(1, n - 1) * 4)))]; };
+const lvChip = (i, solid) => { const l = SP().levels[i]; return h("span", { class: "lv" + (solid ? " solid" : ""), style: `--lv:${lvColor(i)}` }, l ? l.name : "?"); };
+const capName = id => (SP().caps.find(c => c.id === id) || { name: id }).name;
+const HZ_STATUS = [["proposed", "Proposed"], ["agreed", "Agreed"], ["open", "Open"]];
+const catOf = x => x.cat || "Uncategorized";
+
+function safetyNav() {
+  const S = SP(); const agreed = S.hazards.filter(x => x.status === "agreed").length;
+  return [h("button", { class: "nav-item", "aria-current": String(sel.type === "safety"), onclick: () => select({ type: "safety" }) },
+    h("span", { class: "rv-ring", html: '<svg viewBox="0 0 22 22" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 2.5 18 5v5.5c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9V5z"/><path d="M8 11l2 2 4-4.5"/></svg>', style: "color:var(--accent)" }),
+    h("span", { class: "t" }, h("b", null, S.title || "Safety concept"), h("small", null, `${S.hazards.length} hazards · ${agreed} agreed`)))];
+}
+function selectEl(id, options, value, onPick, style) {
+  const s = h("select", { id, style: style || "width:auto" }, options.map(([v, l]) => h("option", { value: v, selected: v === value }, l)));
+  s.addEventListener("change", () => onPick(s.value));
+  return s;
+}
+const levelOptions = (withEmpty) => (withEmpty ? [["", "—"]] : []).concat(SP().levels.map(l => [l.id, l.name]));
+
+function safetyEditor() {
+  const S = SP();
+  const tabs = seg([["catalog", "Hazard catalogue"], ["ladder", "Levels & rules"], ["sim", "Simulator"]], safetyTab, v => { safetyTab = v; renderEditor(); $("#editor").scrollTop = 0; });
+  const head = h("div", { class: "ed-head" },
+    h("div", null, h("div", { class: "crumb" }, "Concept · " + selfName()), h("h2", null, S.title || "Safety concept")),
+    h("div", { class: "actions" },
+      h("button", { class: "btn", onclick: () => saveFile(slug(S.title || "safety_concept") + ".md", safetyMarkdown(), "text/markdown") }, "Markdown"),
+      h("button", { class: "btn", onclick: safetyPdf }, "PDF")));
+  const body = safetyTab === "catalog" ? catalogTab() : safetyTab === "ladder" ? ladderTab() : simTab();
+  return [head, h("div", { style: "margin-bottom:14px" }, tabs), ...body];
+}
+
+/* --- Tab: hazard catalogue --- */
+function catalogTab() {
+  const S = SP(); const cats = [...new Set(S.hazards.map(catOf))];
+  const out = [h("div", { class: "card" }, h("h3", null, "Escalation ladder"),
+    h("div", { class: "ladder" }, S.levels.map((l, i) => [i ? h("span", { class: "arrow" }, "<") : null, lvChip(i, true)])),
+    h("p", { class: "hint", style: "margin:8px 0 0" }, `Every hazard demands a level. ${selfName()} always executes the highest demanded level that is currently possible. Edit the levels under “Levels & rules”.`))];
+  if (!S.hazards.length) out.push(h("div", { class: "rv-empty", style: "padding:28px 20px" },
+    h("div", { style: "font-weight:600;color:var(--fg);margin-bottom:6px" }, "No hazards yet"),
+    "List everything that can go wrong: failing subsystems, energy, positioning, communication, environment.",
+    h("div", { class: "danger-zone", style: "justify-content:center;margin-top:12px" },
+      h("button", { class: "btn primary", onclick: () => addHazard("Subsystems") }, "Add first hazard"))));
+  cats.forEach(cat => {
+    const list = S.hazards.filter(x => catOf(x) === cat);
+    out.push(h("div", { class: "rv-sec" }, h("span", null, cat), h("span", { class: "c" }, String(list.length))));
+    list.forEach(x => out.push(hazardCard(x)));
+    out.push(h("div", { style: "margin:-2px 0 6px" }, h("button", { class: "btn ghost small", onclick: () => addHazard(cat === "Uncategorized" ? "" : cat) }, `+ Hazard in “${cat}”`)));
+  });
+  if (S.hazards.length) out.push(h("div", { class: "danger-zone", style: "margin-top:14px" }, h("button", { class: "btn", onclick: () => addHazard("New category") }, "+ New category")));
+  out.push(h("datalist", { id: "hz-cats" }, cats.map(c => h("option", { value: c }))));
+  return out;
+}
+function addHazard(cat) {
+  const x = { id: uid(), cat, name: "New hazard", detect: "", source: "", level: SP().levels[Math.min(1, SP().levels.length - 1)].id, on: "1", off: "3", escAfter: "", escTo: "", kills: [], why: "", status: "proposed" };
+  SP().hazards.push(x); renderAll();
+  requestAnimationFrame(() => { const el = document.getElementById(`in-${x.id}-name`); if (el) { el.scrollIntoView({ block: "center" }); el.focus(); el.select(); } });
+}
+function hazardCard(x) {
+  const S = SP(); const i = lvIdx(x.level); const arr = S.hazards; const k = arr.indexOf(x);
+  const name = bound(x, "name", { ph: "Hazard name" }); name.classList.add("hz-name");
+  const cat = bound(x, "cat", { ph: "Category", list: "hz-cats" }); cat.classList.add("hz-cat");
+  cat.addEventListener("change", renderAll);
+  return h("article", { class: "hz", style: `--lv:${lvColor(i)}` },
+    h("div", { class: "hz-top" }, name, cat,
+      selectEl(`lv-${x.id}`, levelOptions(false), x.level, v => { x.level = v; renderAll(); }),
+      h("button", { class: "icon", title: "Move up", html: ICON.up, onclick: () => move(arr, k, -1) }),
+      h("button", { class: "icon", title: "Move down", html: ICON.down, onclick: () => move(arr, k, 1) }),
+      armedBtn("icon del", ICON.del, "Delete hazard (click twice)", () => { arr.splice(k, 1); sim.active.delete(x.id); renderAll(); })),
+    h("div", { class: "hz-grid" },
+      labeled("Detection", bound(x, "detect", { ph: "e.g. value < threshold" }), "w2"),
+      labeled("Source", bound(x, "source", { ph: "topic / signal", mono: true }), "w2"),
+      labeled("Onset time (s)", bound(x, "on", { ph: "1", mono: true })),
+      labeled("Clear time (s)", bound(x, "off", { ph: "3", mono: true })),
+      h("div", { class: "f w2" }, h("span", { class: "hint", style: "font-weight:500" }, "Escalation"),
+        h("div", { class: "esc-row" }, "after", bound(x, "escAfter", { ph: "–", mono: true }), "s to",
+          selectEl(`esc-${x.id}`, levelOptions(true), x.escTo, v => { x.escTo = v; renderAll(); }))),
+      S.caps.length ? h("div", { class: "f w4" }, h("span", { class: "hint", style: "font-weight:500" }, "Makes impossible"),
+        h("div", { class: "caps" }, S.caps.map(c => {
+          const id = `kill-${x.id}-${c.id}`; const cb = h("input", { type: "checkbox", id }); cb.checked = x.kills.includes(c.id);
+          cb.addEventListener("change", () => { x.kills = cb.checked ? [...new Set([...x.kills, c.id])] : x.kills.filter(z => z !== c.id); renderAll(); });
+          return h("label", { class: "check", for: id }, cb, c.name);
+        }))) : null,
+      labeled("Rationale", bound(x, "why", { multi: true, rows: 1, ph: "Why this level?" }), "w4")),
+    h("div", null, seg(HZ_STATUS, x.status, v => { x.status = v; renderAll(); })));
+}
+
+/* --- Tab: levels & rules --- */
+function ladderTab() {
+  const S = SP();
+  const general = h("div", { class: "card" }, h("h3", null, "General"),
+    h("div", { class: "grid" },
+      labeled("Concept title", (() => { const e = bound(S, "title", { ph: "Safety concept" }); e.addEventListener("change", renderAll); return e; })()),
+      labeled("Status topic (optional, shown in the simulator)", bound(S, "statusTopic", { ph: "e.g. safety/status", mono: true })),
+      labeled("Prefix of action constants", bound(S, "actionPrefix", { ph: "ACTION_", mono: true }))),
+    h("div", { class: "danger-zone", style: "margin-top:12px" },
+      armedBtn("btn", "Load drone example", "Replaces the safety concept with the drone example", () => { state.safety = exampleSafety(); sim.active.clear(); renderAll(); toast("Drone example loaded"); }, "Replace concept?"),
+      armedBtn("btn danger", "Start empty", "Replaces the safety concept with an empty template", () => { state.safety = minimalSafety(); sim.active.clear(); renderAll(); toast("Empty template loaded"); }, "Delete concept?")));
+
+  const levels = h("div", { class: "card" }, h("h3", null, "Escalation ladder", h("span", { class: "sp" }), h("span", { class: "hint", style: "text-transform:none;letter-spacing:0;font-weight:400" }, "top = lowest level")),
+    h("div", { class: "block", style: "margin-top:0" }, S.levels.map((l, i) => h("div", { class: "lv-row" },
+      h("span", { class: "lv-num" }, String(i)),
+      (() => { const e = bound(l, "name", { ph: "LEVEL", mono: true }); e.addEventListener("change", renderAll); return e; })(),
+      bound(l, "action", { ph: "command / action", mono: true }),
+      bound(l, "desc", { ph: "Description" }),
+      checkbox(l, "clearable", "may end", renderAll),
+      h("div", { class: "row-tools" },
+        h("button", { class: "icon", title: "Move up", html: ICON.up, onclick: () => move(S.levels, i, -1) }),
+        h("button", { class: "icon", title: "Move down", html: ICON.down, onclick: () => move(S.levels, i, 1) }),
+        S.levels.length > 1 ? armedBtn("icon del", ICON.del, "Delete level (click twice)", () => {
+          S.levels.splice(i, 1); const fb = S.levels[Math.min(i, S.levels.length - 1)].id;
+          S.hazards.forEach(x => { if (x.level === l.id) x.level = fb; if (x.escTo === l.id) x.escTo = ""; });
+          S.scenarios.forEach(sc => { if (sc.running === l.id) sc.running = S.levels[0].id; });
+          if (sim.running === l.id) sim.running = S.levels[0].id; renderAll(); }) : null)))),
+    h("div", { class: "foot", style: "border:0;padding:8px 0 0" }, h("button", { class: "btn small", onclick: () => { S.levels.push({ id: uid(), name: "NEW_LEVEL", action: "", needs: [], desc: "", clearable: false }); renderAll(); } }, "+ Level")),
+    h("p", { class: "hint", style: "margin:6px 0 0" }, "“May end”: the level ends on its own once the hazard has cleared, and the mission may continue."));
+
+  const matrix = h("div", { class: "card" }, h("h3", null, "Prerequisites per level"),
+    S.caps.length ? h("div", { class: "matrix-wrap" }, h("table", { class: "matrix" },
+      h("thead", null, h("tr", null, h("th", null, "Level"), S.caps.map(c => h("th", { title: c.desc }, c.name)))),
+      h("tbody", null, S.levels.map((l, i) => h("tr", null, h("td", null, lvChip(i)), S.caps.map(c => {
+        const cb = h("input", { type: "checkbox", id: `need-${l.id}-${c.id}`, "aria-label": `${l.name} requires ${c.name}` }); cb.checked = l.needs.includes(c.id);
+        cb.addEventListener("change", () => { l.needs = cb.checked ? [...new Set([...l.needs, c.id])] : l.needs.filter(z => z !== c.id); renderAll(); });
+        return h("td", null, cb);
+      })))))) : h("p", { class: "hint", style: "margin:0" }, "Add capabilities below to define what each level requires."),
+    h("p", { class: "hint", style: "margin:8px 0 0" }, `If a prerequisite is missing, ${selfName()} chooses the next higher level that is possible.`));
+
+  const caps = h("div", { class: "card" }, h("h3", null, "Capabilities"),
+    h("div", { class: "auth" }, S.caps.map((c, i) => h("div", { class: "auth-row" },
+      (() => { const e = bound(c, "name", { ph: "Capability" }); e.style.maxWidth = "220px"; e.addEventListener("change", renderAll); return e; })(),
+      bound(c, "desc", { ph: "When is it available?" }),
+      armedBtn("icon del", ICON.del, "Delete capability (click twice)", () => {
+        S.caps.splice(i, 1); S.levels.forEach(l => l.needs = l.needs.filter(z => z !== c.id)); S.hazards.forEach(x => x.kills = x.kills.filter(z => z !== c.id)); renderAll(); })))),
+    h("div", { style: "margin-top:8px" }, h("button", { class: "btn small", onclick: () => { S.caps.push({ id: uid(), name: "New capability", desc: "" }); renderAll(); } }, "+ Capability")));
+
+  const auth = h("div", { class: "card" }, h("h3", null, "Precedence", h("span", { class: "sp" }), h("span", { class: "hint", style: "text-transform:none;letter-spacing:0;font-weight:400" }, "top = highest precedence")),
+    h("div", { class: "auth" }, S.authority.map((a, i) => {
+      const id = `self-${a.id}`; const rb = h("input", { type: "radio", name: "self-auth", id }); rb.checked = a.self;
+      rb.addEventListener("change", () => { S.authority.forEach(z => z.self = z === a); renderAll(); });
+      return h("div", { class: "auth-row" },
+        h("span", { class: "lv-num" }, String(i + 1)),
+        (() => { const e = bound(a, "name", { ph: "Authority" }); e.addEventListener("change", renderAll); return e; })(),
+        h("label", { class: "check", for: id, title: "The module this concept describes" }, rb, "this module"),
+        h("button", { class: "icon", title: "Move up", html: ICON.up, onclick: () => move(S.authority, i, -1) }),
+        h("button", { class: "icon", title: "Move down", html: ICON.down, onclick: () => move(S.authority, i, 1) }),
+        armedBtn("icon del", ICON.del, "Delete (click twice)", () => { S.authority.splice(i, 1); renderAll(); }));
+    })),
+    h("div", { style: "margin-top:8px" }, h("button", { class: "btn small", onclick: () => { S.authority.push({ id: uid(), name: "", self: false }); renderAll(); } }, "+ Authority")),
+    h("p", { class: "hint", style: "margin:8px 0 0" }, "Authorities above “this module” can take over; the simulator offers them as stand-down cases."));
+
+  const rules = h("div", { class: "card" }, h("h3", null, "Rules"),
+    h("div", { class: "auth" }, S.rules.map((r, i) => {
+      const ta = h("textarea", { id: `rule-${i}`, rows: 1 }); ta.value = r;
+      ta.addEventListener("input", () => { S.rules[i] = ta.value; changed(); });
+      return h("div", { class: "auth-row", style: "align-items:start" }, h("span", { class: "lv-num", style: "padding-top:6px" }, String(i + 1)), ta,
+        armedBtn("icon del", ICON.del, "Delete rule (click twice)", () => { S.rules.splice(i, 1); renderAll(); }));
+    })),
+    h("div", { class: "danger-zone", style: "margin-top:8px" },
+      h("button", { class: "btn small", onclick: () => { S.rules.push(""); renderAll(); } }, "+ Rule"),
+      armedBtn("btn ghost small", "Restore default rules", "Replaces the rules with the generic default", () => { S.rules = GENERIC_RULES.slice(); renderAll(); }, "Replace rules?")),
+    h("p", { class: "hint", style: "margin:8px 0 0" }, "The rules document the concept. The simulator always applies the escalation logic described by the default rules."));
+  return [general, levels, matrix, caps, auth, rules];
+}
+
+/* --- Tab: simulator --- */
+function simulate() {
+  const S = SP(), L = S.levels, steps = [], me = selfName();
+  const nameOf = i => L[i] ? L[i].name : "?";
+  const runIdx = Math.max(0, L.findIndex(l => l.id === sim.running));
+  const over = S.authority.filter(a => sim.standdown.has(a.id));
+  if (over.length) {
+    steps.push({ t: `${over.map(a => a.name).join(", ")} ${over.length > 1 ? "have" : "has"} taken over. This has precedence over ${me}.`, warn: true });
+    if (runIdx > 0) steps.push({ t: `${me} cancels ${nameOf(runIdx)} and only reports.` });
+    return { standdown: true, chosen: 0, steps, decision: `${me} stands down`, runIdx };
+  }
+  const act = S.hazards.filter(x => sim.active.has(x.id));
+  const lost = new Set();
+  let demand = 0;
+  if (!act.length) steps.push({ t: "No hazard active." });
+  act.forEach(x => {
+    let lv = lvIdx(x.level), note = "";
+    if (sim.escalated && x.escTo && lvIdx(x.escTo) > lv) { lv = lvIdx(x.escTo); note = ` (escalated after ${x.escAfter || "?"} s)`; }
+    steps.push({ t: `“${x.name}” demands ${nameOf(lv)}${note}.` });
+    x.kills.forEach(c => lost.add(c));
+    if (x.kills.length) steps.push({ t: `“${x.name}” makes impossible: ${x.kills.map(capName).join(", ")}.`, warn: true });
+    demand = Math.max(demand, lv);
+  });
+  if (act.length > 1) steps.push({ t: `Highest demanded level: ${nameOf(demand)}.` });
+  let floor = demand;
+  if (runIdx > 0) {
+    if (sim.failed) { floor = Math.max(floor, runIdx + 1); steps.push({ t: `${nameOf(runIdx)} has failed, so at least ${runIdx + 1 < L.length ? nameOf(runIdx + 1) : "nothing left"}.`, warn: true }); }
+    else if (demand < runIdx) {
+      if (L[runIdx].clearable) steps.push({ t: `${nameOf(runIdx)} may end because the hazard has cleared.` });
+      else { floor = runIdx; steps.push({ t: `No downgrade: ${nameOf(runIdx)} keeps running.` }); }
+    }
+  }
+  const missing = i => (L[i].needs || []).filter(c => lost.has(c));
+  let chosen = -1;
+  for (let i = floor; i < L.length; i++) {
+    const m = missing(i);
+    if (!m.length) { chosen = i; break; }
+    steps.push({ t: `${nameOf(i)} is not possible (missing: ${m.map(capName).join(", ")}).`, warn: true });
+  }
+  if (chosen < 0) {
+    const fallback = S.authority.filter(a => !a.self && S.authority.indexOf(a) < S.authority.indexOf(selfAuth() || S.authority[S.authority.length - 1]));
+    steps.push({ t: `No level is possible.${fallback.length ? ` ${fallback[fallback.length - 1].name} has to take over.` : ""}`, warn: true });
+    return { none: true, chosen: -1, steps, decision: "No reaction possible", runIdx, fallback: fallback.length ? fallback[fallback.length - 1].name : "" };
+  }
+  let decision;
+  if (chosen === runIdx) decision = chosen === 0 ? "Monitor only" : `${nameOf(chosen)} keeps running`;
+  else if (chosen > runIdx) decision = runIdx > 0 ? `Cancel ${nameOf(runIdx)}, start ${nameOf(chosen)}` : `Start ${nameOf(chosen)}`;
+  else decision = chosen > 0 ? `End ${nameOf(runIdx)}, start ${nameOf(chosen)}` : `End ${nameOf(runIdx)}, control returns`;
+  return { chosen, steps, decision, runIdx };
+}
+function simTab() {
+  const S = SP(); if (!S.levels.find(l => l.id === sim.running)) sim.running = S.levels[0].id;
+  const r = simulate(); const me = selfName();
+  const cats = [...new Set(S.hazards.map(catOf))];
+  const simCheck = (key, text) => { const id = "sim-" + key; const cb = h("input", { type: "checkbox", id }); cb.checked = !!sim[key];
+    cb.addEventListener("change", () => { sim[key] = cb.checked; renderEditor(); }); return h("label", { class: "check", for: id }, cb, text); };
+  const selfI = S.authority.findIndex(a => a.self);
+  const above = selfI > 0 ? S.authority.slice(0, selfI) : [];
+  const applySc = sc => {
+    sim = { active: new Set(sc.active.filter(id => S.hazards.some(x => x.id === id))), running: S.levels.some(l => l.id === sc.running) ? sc.running : S.levels[0].id,
+      failed: !!sc.failed, escalated: !!sc.escalated, standdown: new Set(sc.standdown || []) };
+    renderEditor();
+  };
+  const scName = h("input", { type: "text", id: "sc-name", placeholder: "Name of the current situation" });
+  const saveSc = () => {
+    const name = scName.value.trim() || `Scenario ${S.scenarios.length + 1}`;
+    S.scenarios.push({ id: uid(), name, active: [...sim.active], running: sim.running, failed: sim.failed, escalated: sim.escalated, standdown: [...sim.standdown] });
+    renderAll(); toast("Scenario saved");
+  };
+  scName.addEventListener("keydown", e => { if (e.key === "Enter") saveSc(); });
+  const left = h("div", { class: "card", style: "margin:0" }, h("h3", null, "Situation", h("span", { class: "sp" }),
+      h("button", { class: "btn ghost small", onclick: () => { sim = { active: new Set(), running: S.levels[0].id, failed: false, escalated: false, standdown: new Set() }; renderEditor(); } }, "Reset")),
+    h("div", { class: "f", style: "margin-bottom:6px" }, h("span", { class: "hint", style: "font-weight:500" }, "Currently running"),
+      selectEl("sim-running", levelOptions(false), sim.running, v => { sim.running = v; renderEditor(); }, "width:100%")),
+    h("div", { class: "sim-list" },
+      simCheck("failed", "Running reaction fails"),
+      simCheck("escalated", "Escalation times have elapsed"),
+      above.map(a => { const id = "simsd-" + a.id; const cb = h("input", { type: "checkbox", id }); cb.checked = sim.standdown.has(a.id);
+        cb.addEventListener("change", () => { cb.checked ? sim.standdown.add(a.id) : sim.standdown.delete(a.id); renderEditor(); });
+        return h("label", { class: "check", for: id }, cb, `${a.name || "Authority"} has taken over`); }),
+      S.hazards.length ? null : h("p", { class: "hint", style: "margin:8px 0 0" }, "Add hazards in the catalogue to simulate them."),
+      cats.map(cat => [h("div", { class: "sim-cat" }, cat), S.hazards.filter(x => catOf(x) === cat).map(x => {
+        const id = "simh-" + x.id; const cb = h("input", { type: "checkbox", id }); cb.checked = sim.active.has(x.id);
+        cb.addEventListener("change", () => { cb.checked ? sim.active.add(x.id) : sim.active.delete(x.id); renderEditor(); });
+        return h("label", { class: "check", for: id }, cb, x.name, lvChip(lvIdx(x.level)));
+      })])));
+  const col = r.standdown ? "var(--muted)" : r.none ? "var(--red)" : lvColor(r.chosen);
+  const big = r.standdown ? "Stand down" : r.none ? (r.fallback ? r.fallback + " takes over" : "No reaction") : S.levels[r.chosen].name;
+  const resumable = !r.none && (r.chosen <= 0 || S.levels[r.chosen].clearable);
+  const status = r.standdown || r.none || !S.statusTopic ? null : `${S.statusTopic}\nstate: ${r.chosen > 0 ? "ACTIVE" : "INACTIVE"}\nactive_action: ${S.actionPrefix || ""}${S.levels[r.chosen].name}\nresumable: ${resumable}`;
+  const action = !r.standdown && !r.none && r.chosen > 0 ? S.levels[r.chosen].action : "";
+  const right = h("div", { class: "result", style: `--lv:${col}` },
+    h("div", { class: "hint", style: "text-transform:uppercase;letter-spacing:.07em;font-weight:600;font-size:11px" }, `${me} responds with`),
+    h("div", { class: "big" }, big),
+    h("div", { class: "decision" }, r.decision, action ? h("span", { class: "hint", style: "font-weight:400" }, " · ", h("code", { class: "mono" }, action)) : null),
+    h("ol", null, r.steps.map(s => h("li", { class: s.warn ? "warn" : null }, s.t))),
+    status ? h("pre", { class: "code" }, status) : null);
+  return [
+    h("div", { class: "card" }, h("h3", null, "Scenarios"),
+      S.scenarios.length ? h("div", { class: "presets" }, S.scenarios.map((sc, i) => h("span", { style: "display:inline-flex;align-items:center;gap:0" },
+        h("button", { class: "btn small", onclick: () => applySc(sc) }, sc.name),
+        armedBtn("icon del", ICON.del, "Delete scenario (click twice)", () => { S.scenarios.splice(i, 1); renderAll(); })))) :
+        h("p", { class: "hint", style: "margin:0" }, "No scenarios yet. Set up a situation below and save it."),
+      h("div", { class: "esc-row", style: "margin-top:10px" }, h("div", { style: "flex:1;min-width:180px" }, scName), h("button", { class: "btn small", onclick: saveSc }, "Save situation as scenario"))),
+    h("div", { class: "sim" }, left, right),
+  ];
+}
+
+/* --- Output: preview, Markdown, PDF --- */
+function safetyHTML() {
+  const S = SP(); const cats = [...new Set(S.hazards.map(catOf))];
+  const st = Object.fromEntries(HZ_STATUS);
+  let html = `<h2 style="margin-bottom:2px">${esc(S.title || "Safety concept")}</h2><p class="small">Status ${esc(today())} · ${S.hazards.length} hazards · ${S.hazards.filter(x => x.status === "agreed").length} agreed</p>`;
+  html += `<p class="ttl" style="margin:0 0 4px">1 Precedence</p><p>${S.authority.map(a => esc(a.name) + (a.self ? " (this module)" : "")).join(" &gt; ")}</p>`;
+  html += `<p class="ttl" style="margin:12px 0 4px">2 Rules</p><ol style="margin:0 0 12px;padding-left:18px">${S.rules.filter(r => r.trim()).map(r => `<li>${esc(r)}</li>`).join("")}</ol>`;
+  html += `<p class="ttl" style="margin:12px 0 6px">3 Escalation ladder</p><table><tbody><tr class="hd thick"><th style="width:22%">Level</th><th style="width:24%">Action</th><th>Prerequisites</th><th style="width:13%">May end</th></tr>`;
+  S.levels.forEach(l => html += `<tr><td>${esc(l.name)}</td><td>${esc(l.action) || "–"}</td><td>${l.needs.map(c => esc(capName(c))).join(", ") || "–"}</td><td>${l.clearable ? "yes" : "no"}</td></tr>`);
+  html += "</tbody></table>";
+  html += `<p class="ttl" style="margin:12px 0 6px">4 Hazard catalogue</p>`;
+  if (!S.hazards.length) html += '<p style="color:#666">No hazards yet.</p>';
+  cats.forEach(cat => {
+    html += `<p style="font-weight:700;margin:8px 0 4px">${esc(cat)}</p><table class="en"><tbody><tr class="hd thick"><th style="width:22%">Hazard</th><th>Detection</th><th style="width:13%">Level</th><th style="width:20%">Escalation</th><th style="width:13%">Status</th></tr>`;
+    S.hazards.filter(x => catOf(x) === cat).forEach(x => {
+      const esc2 = x.escTo ? `after ${esc(x.escAfter || "?")} s → ${esc(S.levels[lvIdx(x.escTo)].name)}` : "–";
+      const kills = x.kills.length ? `<br><i>makes impossible: ${x.kills.map(c => esc(capName(c))).join(", ")}</i>` : "";
+      const why = x.why ? `<br><span style="color:#666">${esc(x.why)}</span>` : "";
+      html += `<tr><td>${esc(x.name)}${why}</td><td>${esc(x.detect)}${x.source ? `<br><code>${esc(x.source)}</code>` : ""}<br><span style="color:#666">onset ${esc(x.on || "0")} s · clear ${esc(x.off || "0")} s</span>${kills}</td><td>${esc(S.levels[lvIdx(x.level)].name)}</td><td>${esc2}</td><td>${x.status === "open" ? '<span class="red">Open</span>' : esc(st[x.status] || x.status)}</td></tr>`;
+    });
+    html += "</tbody></table>";
+  });
+  return html;
+}
+function safetyMarkdown() {
+  const S = SP(); const p = s => String(s ?? "").replace(/\|/g, "\\|").replace(/\n+/g, "<br>"); const st = Object.fromEntries(HZ_STATUS);
+  const md = [`# ${S.title || "Safety concept"}`, "", `Status ${today()}`, "", "## 1 Precedence", "", S.authority.map(a => a.name + (a.self ? " (this module)" : "")).join(" > "), "", "## 2 Rules", ""];
+  S.rules.filter(r => r.trim()).forEach((r, i) => md.push(`${i + 1}. ${r}`));
+  md.push("", "## 3 Escalation ladder", "", "| Level | Action | Prerequisites | May end |", "|---|---|---|---|");
+  S.levels.forEach(l => md.push(`| ${p(l.name)} | ${l.action ? "`" + l.action + "`" : "–"} | ${p(l.needs.map(capName).join(", ")) || "–"} | ${l.clearable ? "yes" : "no"} |`));
+  md.push("", "### Capabilities", "", "| Capability | Meaning |", "|---|---|");
+  S.caps.forEach(c => md.push(`| ${p(c.name)} | ${p(c.desc)} |`));
+  md.push("", "## 4 Hazard catalogue", "");
+  [...new Set(S.hazards.map(catOf))].forEach(cat => {
+    md.push(`### ${cat}`, "", "| Hazard | Detection | Source | Onset / clear (s) | Level | Escalation | Makes impossible | Status | Rationale |", "|---|---|---|---|---|---|---|---|---|");
+    S.hazards.filter(x => catOf(x) === cat).forEach(x => md.push(`| ${p(x.name)} | ${p(x.detect)} | ${x.source ? "`" + x.source + "`" : ""} | ${p(x.on)} / ${p(x.off)} | ${S.levels[lvIdx(x.level)].name} | ${x.escTo ? `after ${p(x.escAfter)} s → ${S.levels[lvIdx(x.escTo)].name}` : "–"} | ${p(x.kills.map(capName).join(", "))} | ${st[x.status] || x.status} | ${p(x.why)} |`));
+    md.push("");
+  });
+  return md.join("\n");
+}
+function safetyPdf() {
+  if (!window.pdfMake) { toast("The PDF library did not load. Reload the page and try again."); return; }
+  const S = SP(); const st = Object.fromEntries(HZ_STATUS); const H = t => ({ text: t, bold: true });
+  const content = [
+    { text: S.title || "Safety concept", fontSize: 18, bold: true }, { text: `Status ${today()}`, fontSize: 9, color: "#555", margin: [0, 2, 0, 14] },
+    { text: "1  Precedence", bold: true, fontSize: 12, margin: [0, 0, 0, 4] }, { text: S.authority.map(a => a.name + (a.self ? " (this module)" : "")).join("  >  "), margin: [0, 0, 0, 12] },
+    { text: "2  Rules", bold: true, fontSize: 12, margin: [0, 0, 0, 4] }, { ol: S.rules.filter(r => r.trim()), margin: [0, 0, 0, 12] },
+    { text: "3  Escalation ladder", bold: true, fontSize: 12, margin: [0, 0, 0, 6] },
+    { table: { headerRows: 1, widths: [90, 100, "*", 50], body: [["Level", "Action", "Prerequisites", "May end"].map(H)]
+      .concat(S.levels.map(l => [l.name, l.action || "–", l.needs.map(capName).join(", ") || "–", l.clearable ? "yes" : "no"])) }, layout: lay(new Set([1])), margin: [0, 0, 0, 14] },
+    { text: "4  Hazard catalogue", bold: true, fontSize: 12, margin: [0, 0, 0, 6] },
+  ];
+  if (!S.hazards.length) content.push({ text: "No hazards yet.", color: "#666" });
+  [...new Set(S.hazards.map(catOf))].forEach(cat => {
+    const body = [["Hazard", "Detection", "Level", "Escalation", "Status"].map(H)];
+    S.hazards.filter(x => catOf(x) === cat).forEach(x => body.push([
+      { stack: [x.name, x.why ? { text: x.why, color: "#666", fontSize: 7.5 } : ""] },
+      { stack: [x.detect || "", x.source ? { text: x.source, color: "#444", fontSize: 7.5 } : "", { text: `onset ${x.on || 0} s · clear ${x.off || 0} s`, color: "#666", fontSize: 7.5 },
+        x.kills.length ? { text: "makes impossible: " + x.kills.map(capName).join(", "), italics: true, fontSize: 7.5 } : ""] },
+      S.levels[lvIdx(x.level)].name,
+      x.escTo ? `after ${x.escAfter || "?"} s → ${S.levels[lvIdx(x.escTo)].name}` : "–",
+      x.status === "open" ? { text: "Open", color: RED, bold: true } : (st[x.status] || x.status)]));
+    content.push({ text: cat, bold: true, margin: [0, 4, 0, 4] },
+      { table: { headerRows: 1, dontBreakRows: true, widths: ["24%", "*", 62, 78, 52], body }, layout: lay(new Set([1])), fontSize: 8.6, margin: [0, 0, 0, 10] });
+  });
+  pdfMake.createPdf({ pageSize: "A4", pageMargins: [56, 56, 56, 56], defaultStyle: { fontSize: 9.5, lineHeight: 1.15 }, info: { title: S.title || "Safety concept" }, content,
+    footer: c => ({ text: String(c), alignment: "center", fontSize: 9, margin: [0, 20, 0, 0] }) })
+    .getBlob(b => saveFile(slug(S.title || "safety_concept") + ".pdf", b, "application/pdf"));
+}
+
+/* ---------- View tabs ---------- */
+function setView(v) { $("#app").dataset.view = v; $("#tabEdit").setAttribute("aria-pressed", String(v === "edit")); $("#tabPrev").setAttribute("aria-pressed", String(v === "preview")); }
+$("#tabEdit").addEventListener("click", () => setView("edit"));
+$("#tabPrev").addEventListener("click", () => setView("preview"));
+
+/* ---------- Boot ---------- */
+document.body.append(h("datalist", { id: "types" }, TYPES.map(t => h("option", { value: t }))));
+state = normalize(load());
+const g0 = state.groups[0];
+sel = g0 && g0.items[0] ? { type: "item", gid: g0.id, iid: g0.items[0].id } : { type: "doc" };
+renderAll();
+})();
+</script>
+</body>
+</html>
