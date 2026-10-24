@@ -310,6 +310,8 @@ table.matrix input{accent-color:var(--accent);width:16px;height:16px}
 .nrow{display:grid;grid-template-columns:18px minmax(0,1.2fr) minmax(0,1fr) minmax(0,130px) minmax(0,1.2fr) 28px;gap:6px;align-items:center}
 .nrow.out{grid-template-columns:18px minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.4fr) 28px}
 .nrow.custom{grid-template-columns:72px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.4fr) 28px}
+.nrow.ref{grid-template-columns:minmax(0,1.5fr) minmax(0,.55fr) minmax(0,.45fr) minmax(0,2.4fr) 28px;align-items:start}
+.nrow.ref textarea{min-height:34px;font-size:13px;line-height:1.35}
 .nrow.head{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .nrow input[type=text],.nrow select{padding:5px 7px}
 .files{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
@@ -322,6 +324,8 @@ table.matrix input{accent-color:var(--accent);width:16px;height:16px}
 @media (max-width:760px){
   .nrow,.nrow.out,.nrow.custom{grid-template-columns:22px minmax(0,1fr) minmax(0,1fr) 28px;padding-bottom:6px;border-bottom:1px dashed var(--line)}
   .nrow.custom{grid-template-columns:64px minmax(0,1fr) minmax(0,1fr) 28px}
+  .nrow.ref{grid-template-columns:minmax(0,1.4fr) minmax(0,.7fr) minmax(0,.5fr) 28px}
+  .nrow.ref > :nth-child(1){grid-area:1/1} .nrow.ref > :nth-child(2){grid-area:1/2} .nrow.ref > :nth-child(3){grid-area:1/3} .nrow.ref > :nth-child(4){grid-area:2/1/3/4} .nrow.ref > :nth-child(5){grid-area:1/4}
   .nrow > :nth-child(1){grid-area:1/1} .nrow > :nth-child(2){grid-area:1/2} .nrow > :nth-child(3){grid-area:1/3}
   .nrow:not(.out) > :nth-child(4){grid-area:2/2} .nrow:not(.out) > :nth-child(5){grid-area:2/3} .nrow:not(.out) > :nth-child(6){grid-area:1/4}
   .nrow.out > :nth-child(4){grid-area:2/2/3/4} .nrow.out > :nth-child(5){grid-area:1/4}
@@ -1697,6 +1701,9 @@ function normalizeSafety(s) {
     x.key ??= ""; x.onMissing ||= "ignore"; x.rule = normRule(x.rule);
   });
   s.statusTopic ??= "";
+  s.refSource ??= "";
+  s.refs = Array.isArray(s.refs) ? s.refs : [];
+  s.refs.forEach(r => { r.id ||= uid(); r.name ??= ""; r.value ??= ""; r.unit ??= ""; r.meaning ??= ""; });
   if (!Array.isArray(s.scenarios)) s.scenarios = [];
   s.scenarios.forEach(sc => { sc.id ||= uid(); sc.active ||= []; sc.standdown ||= []; });
   return s;
@@ -1861,6 +1868,10 @@ function safetyYaml() {
     if (x.escTo) y.push("    escalate:", `      after_s: ${yamlVal(x.escAfter)}`, `      to: ${lvName(x.escTo)}`);
     if (x.kills.length) y.push(`    disables: [${x.kills.map(capOf).join(", ")}]`);
   });
+  if (S.refs.length) {
+    y.push("", `reference_limits:  # documentation only${S.refSource ? ": " + S.refSource.replace(/\n/g, " ") : ""}`);
+    S.refs.forEach(r => y.push(`  - name: ${yamlStr(r.name)}`, `    value: ${yamlVal(r.value)}`, ...(r.unit ? [`    unit: ${yamlStr(r.unit)}`] : []), `    meaning: ${JSON.stringify(r.meaning)}`));
+  }
   return y.join("\n") + "\n";
 }
 function exportSafetyYaml() {
@@ -2002,7 +2013,15 @@ function ladderTab() {
       h("button", { class: "btn small", onclick: () => { S.rules.push(""); renderAll(); } }, "+ Rule"),
       armedBtn("btn ghost small", "Restore default rules", "Replaces the rules with the generic default", () => { S.rules = GENERIC_RULES.slice(); renderAll(); }, "Replace rules?")),
     h("p", { class: "hint", style: "margin:8px 0 0" }, "The rules document the concept. The simulator always applies the escalation logic described by the default rules."));
-  return [general, levels, matrix, caps, auth, rules];
+  const refs = h("div", { class: "card" }, h("h3", null, "Reference limits", h("span", { class: "sp" }), h("span", { class: "hint", style: "text-transform:none;letter-spacing:0;font-weight:400" }, "e.g. autopilot failsafe parameters")),
+    labeled("Source / configuration", bound(S, "refSource", { ph: "e.g. PX4 v1.18.0-beta2, default parameters of the gz_x500 airframe" }), "full"),
+    h("div", { class: "nrows", style: "margin-top:10px" },
+      h("div", { class: "nrow ref head" }, h("span", null, "Parameter"), h("span", null, "Value"), h("span", null, "Unit"), h("span", null, "Meaning / effect on Safety"), h("span")),
+      S.refs.map((r, i) => h("div", { class: "nrow ref" }, bound(r, "name", { mono: true, ph: "BAT_LOW_THR" }), bound(r, "value", { mono: true, ph: "15" }), bound(r, "unit", { ph: "unit" }),
+        bound(r, "meaning", { ph: "What happens at this limit", multi: true, rows: 2 }), armedBtn("icon del", ICON.del, "Remove (click twice)", () => { S.refs.splice(i, 1); renderAll(); }))),
+      h("div", null, h("button", { class: "btn ghost small", onclick: () => { S.refs.push({ id: uid(), name: "", value: "", unit: "", meaning: "" }); renderAll(); } }, "+ Limit"))),
+    h("p", { class: "hint", style: "margin:8px 0 0" }, "Limits of other systems that Safety's thresholds are measured against. Shown in the exports and in the YAML configuration as documentation."));
+  return [general, levels, matrix, caps, auth, rules, refs];
 }
 
 /* --- Tab: simulator --- */
@@ -2135,6 +2154,11 @@ function safetyHTML() {
     });
     html += "</tbody></table>";
   });
+  if (S.refs.length) {
+    html += `<p class="ttl" style="margin:14px 0 4px">5 Reference limits</p>${S.refSource ? `<p class="small" style="margin:0 0 6px">${esc(S.refSource)}</p>` : ""}<table><tbody><tr class="hd thick"><th style="width:26%">Parameter</th><th style="width:16%">Value</th><th>Meaning</th></tr>`;
+    S.refs.forEach(r => html += `<tr><td><code>${esc(r.name)}</code></td><td>${esc(r.value)}${r.unit ? " " + esc(r.unit) : ""}</td><td>${esc(r.meaning)}</td></tr>`);
+    html += "</tbody></table>";
+  }
   return html;
 }
 function safetyMarkdown() {
@@ -2151,6 +2175,13 @@ function safetyMarkdown() {
     S.hazards.filter(x => catOf(x) === cat).forEach(x => md.push(`| ${p(x.name)} | ${p(detectText(x))} | ${ruleText(x.rule) ? "`" + p(ruleText(x.rule)) + "`" : ""} | ${x.source ? "`" + x.source + "`" : ""} | ${p(x.on)} / ${p(x.off)} | ${S.levels[lvIdx(x.level)].name} | ${x.escTo ? `after ${p(x.escAfter)} s → ${S.levels[lvIdx(x.escTo)].name}` : "–"} | ${p(x.kills.map(capName).join(", "))} | ${st[x.status] || x.status} | ${p(x.why)} |`));
     md.push("");
   });
+  if (S.refs.length) {
+    md.push("## 5 Reference limits", "");
+    if (S.refSource) md.push(S.refSource, "");
+    md.push("| Parameter | Value | Meaning |", "|---|---|---|");
+    S.refs.forEach(r => md.push(`| \`${p(r.name)}\` | ${p(r.value)}${r.unit ? " " + p(r.unit) : ""} | ${p(r.meaning)} |`));
+    md.push("");
+  }
   return md.join("\n");
 }
 function safetyPdf() {
@@ -2178,6 +2209,12 @@ function safetyPdf() {
     content.push({ text: cat, bold: true, margin: [0, 4, 0, 4] },
       { table: { headerRows: 1, dontBreakRows: true, widths: ["24%", "*", 62, 78, 52], body }, layout: lay(new Set([1])), fontSize: 8.6, margin: [0, 0, 0, 10] });
   });
+  if (S.refs.length) {
+    content.push({ text: "5  Reference limits", bold: true, fontSize: 12, margin: [0, 6, 0, 4] });
+    if (S.refSource) content.push({ text: S.refSource, fontSize: 8.6, color: "#555", margin: [0, 0, 0, 6] });
+    content.push({ table: { headerRows: 1, dontBreakRows: true, widths: ["26%", 70, "*"], body: [["Parameter", "Value", "Meaning"].map(H)]
+      .concat(S.refs.map(r => [r.name, `${r.value}${r.unit ? " " + r.unit : ""}`, r.meaning])) }, layout: lay(new Set([1])), fontSize: 8.6 });
+  }
   pdfMake.createPdf({ pageSize: "A4", pageMargins: [56, 56, 56, 56], defaultStyle: { fontSize: 9.5, lineHeight: 1.15 }, info: { title: S.title || "Safety concept" }, content,
     footer: c => ({ text: String(c), alignment: "center", fontSize: 9, margin: [0, 20, 0, 0] }) })
     .getBlob(b => saveFile(slug(S.title || "safety_concept") + ".pdf", b, "application/pdf"));
