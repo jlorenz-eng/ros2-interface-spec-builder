@@ -2,6 +2,8 @@
 
 A lightweight, browser-based tool for creating and documenting ROS 2 interface specifications, tracking design decisions, and exploring safety concepts.
 
+This is mainly a personal tool.
+
 **[Try it online](https://jlorenz-eng.github.io/ros2-interface-spec-builder/)**
 
 ![Interface Spec Builder with the example project](docs/screenshot.png)
