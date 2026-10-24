@@ -299,6 +299,34 @@ table.matrix input{accent-color:var(--accent);width:16px;height:16px}
 .rule-row input[type=text]{flex:0 1 auto;min-width:56px}
 .rule-text{font-family:var(--f-mono);font-size:12px;color:var(--muted);overflow-wrap:anywhere}
 
+/* BT nodes */
+.fcol{display:flex;flex-direction:column;gap:4px;align-items:flex-start;min-width:0}
+.fcol > span:first-child{font-size:12px;color:var(--muted);font-weight:500}
+.pat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.pat{display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:10px 12px;cursor:pointer}
+.pat:hover{border-color:var(--accent);background:var(--surface)}
+.pat-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.nrows{display:flex;flex-direction:column;gap:6px}
+.nrow{display:grid;grid-template-columns:18px minmax(0,1.2fr) minmax(0,1fr) minmax(0,130px) minmax(0,1.2fr) 28px;gap:6px;align-items:center}
+.nrow.out{grid-template-columns:18px minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.4fr) 28px}
+.nrow.custom{grid-template-columns:72px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.4fr) 28px}
+.nrow.head{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.nrow input[type=text],.nrow select{padding:5px 7px}
+.files{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.files button{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:3px 8px;font-family:var(--f-mono);font-size:11.5px;cursor:pointer}
+.files button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.code-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;min-width:0}
+.code-bar .mono{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.code-view{background:var(--surface)}
+.tok-c{color:var(--muted);font-style:italic}.tok-s{color:var(--topic)}.tok-k{color:var(--action);font-weight:500}.tok-n{color:var(--service)}
+@media (max-width:760px){
+  .nrow,.nrow.out,.nrow.custom{grid-template-columns:22px minmax(0,1fr) minmax(0,1fr) 28px;padding-bottom:6px;border-bottom:1px dashed var(--line)}
+  .nrow.custom{grid-template-columns:64px minmax(0,1fr) minmax(0,1fr) 28px}
+  .nrow > :nth-child(1){grid-area:1/1} .nrow > :nth-child(2){grid-area:1/2} .nrow > :nth-child(3){grid-area:1/3}
+  .nrow:not(.out) > :nth-child(4){grid-area:2/2} .nrow:not(.out) > :nth-child(5){grid-area:2/3} .nrow:not(.out) > :nth-child(6){grid-area:1/4}
+  .nrow.out > :nth-child(4){grid-area:2/2/3/4} .nrow.out > :nth-child(5){grid-area:1/4}
+  .nrow.head{display:none}}
+
 /* Responsive */
 @media (max-width:1180px){
   .tabs{display:inline-flex}
@@ -431,14 +459,26 @@ function seed() {
       { id: uid(), title: "Data FCI receives from MC", overview: true, items: [takeoff, land] },
       { id: uid(), title: "Data MC receives from Navigation", overview: false, items: [hb] },
     ],
-    points: examplePoints(), review: {}, safety: exampleSafety(),
+    points: examplePoints(), review: {}, safety: exampleSafety(), nodes: exampleNodes(land, hb),
   };
+}
+
+function exampleNodes(land, hb) {
+  const n = emptyNodes(); n.pkg = "mission_bt_nodes"; n.ns = "mission_bt_nodes"; n.ifacePkg = "mission_interfaces";
+  const bat = Object.assign(newNode("compare"), { name: "BatteryLow", desc: "Battery below the return reserve.", key: "battery_remaining_pct", type: "float", op: "<", thr: "30", hyst: true, clear: "35" });
+  const fl = Object.assign(newNode("action"), { name: "Land", iface: land.id, type: "mission_interfaces/action/Land", server: "mission/land" });
+  fl.goal = fieldsOf(land, "Goal").map(f => inRow(f, "")); fl.fb = fieldsOf(land, "Feedback").map(f => outRow(f, "land"));
+  fl.res = fieldsOf(land, "Result").filter(f => f.field !== "success").map(f => outRow(f, "land", f.field === "error_code"));
+  const old = Object.assign(newNode("compare"), { name: "NavigationLost", desc: "No heartbeat from Navigation.", key: "navigation_heartbeat_age_s", op: ">", thr: "3.0", missing: "success" });
+  n.list = [bat, old, fl];
+  n.snapshot = [{ id: uid(), iface: hb.id, type: "mission_interfaces/msg/Heartbeat", topic: "navigation/heartbeat", ageKey: "navigation_heartbeat_age_s", rows: fieldsOf(hb, "Message").map(f => outRow(f, "navigation", f.field === "heartbeat_count")) }];
+  return n;
 }
 
 let state, sel;
 function emptyProject() {
   return { doc: { title: "Interface Specification", subtitle: "", meta: "", notes: "", cover: true, toc: true, numbering: true, pageBreak: true, commType: false },
-    groups: [{ id: uid(), title: "Data A receives from B", overview: false, items: [] }], review: {}, points: emptyPoints(), safety: minimalSafety() };
+    groups: [{ id: uid(), title: "Data A receives from B", overview: false, items: [] }], review: {}, points: emptyPoints(), safety: minimalSafety(), nodes: emptyNodes() };
 }
 function load() {
   try { const raw = localStorage.getItem(STORE_KEY); if (raw) { const s = JSON.parse(raw); if (valid(s)) return s; } } catch (e) {}
@@ -457,6 +497,7 @@ function normalize(s) {
   s.points = normalizePoints(s.points);
   migrateReviewKeys(s);
   s.safety = normalizeSafety(s.safety);
+  s.nodes = normalizeNodes(s.nodes);
   return s;
 }
 let saveT;
@@ -522,7 +563,7 @@ function move(arr, i, d) { const j = i + d; if (j < 0 || j >= arr.length) return
 function focusLast(sel2) { requestAnimationFrame(() => { const els = document.querySelectorAll(sel2); const el = els[els.length - 1]; if (el) el.focus(); }); }
 
 function find() {
-  if (sel.type === "doc" || sel.type === "review" || sel.type === "safety") return {};
+  if (["doc", "review", "safety", "nodes", "node", "snapshot"].includes(sel.type)) return {};
   const gi = state.groups.findIndex(g => g.id === sel.gid); const g = state.groups[gi];
   if (!g) { sel = { type: "doc" }; return {}; }
   if (sel.type === "group") return { g, gi };
@@ -559,6 +600,7 @@ function renderNav() {
   });
   nav.append(h("div", { class: "add-row", style: "margin-top:12px" },
     h("button", { class: "btn small", onclick: addGroup }, "+ Section")));
+  nav.append(...nodesNav());
 }
 function select(s) { sel = s; if (window.matchMedia("(max-width:760px)").matches) setView("edit"); renderAll(); $("#editor").scrollTop = 0; }
 function addGroup() { const g = { id: uid(), title: "Data X receives from Y", overview: false, items: [] }; state.groups.push(g); select({ type: "group", gid: g.id }); }
@@ -574,9 +616,13 @@ function renderEditor() {
   if (sel.type === "doc") parts = docEditor();
   else if (sel.type === "review") parts = reviewBoard();
   else if (sel.type === "safety") parts = safetyEditor();
+  else if (sel.type === "nodes") parts = nodesHome();
+  else if (sel.type === "snapshot") parts = snapshotEditor();
+  else if (sel.type === "node") { const n = NS().list.find(x => x.id === sel.nid); if (!n) { sel = { type: "nodes" }; parts = nodesHome(); } else parts = nodeEditor(n); }
   else if (sel.type === "group") parts = groupEditor(f.g, f.gi);
   else parts = itemEditor(f.g, f.gi, f.it, f.ii);
   ed.append(...parts.filter(Boolean));
+  const bl = $("#bb-list"); if (bl) { bl.textContent = ""; [...new Set([...bbKeys().keys(), ...knownSignals()])].sort().forEach(k => bl.append(h("option", { value: k }))); }
   requestAnimationFrame(() => {
     ed.querySelectorAll(".row textarea").forEach(grow);
     if (focusId) { const el = document.getElementById("qc-" + focusId); if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("flash"); } }
@@ -619,13 +665,13 @@ function docEditor() {
   ];
 }
 let pendingImport = null;
-const projectIsEmpty = () => state.groups.every(g => !g.items.length) && !state.points.sections.length && !state.safety.hazards.length;
+const projectIsEmpty = () => state.groups.every(g => !g.items.length) && !state.points.sections.length && !state.safety.hazards.length && !state.nodes.list.length;
 function importPartsCard() {
   const file = h("input", { type: "file", id: "parts-file", accept: ".json,application/json", hidden: true });
   file.addEventListener("change", async () => {
     const f = file.files[0]; file.value = ""; if (!f) return;
     try { const s = JSON.parse(await f.text()); if (!valid(s)) throw new Error("not a project");
-      pendingImport = { name: f.name, data: normalize(s), groups: true, points: true, safety: false }; renderEditor(); }
+      pendingImport = { name: f.name, data: normalize(s), groups: true, points: true, safety: false, nodes: false }; renderEditor(); }
     catch (err) { toast("This file is not a valid project (expected JSON from this tool)."); }
   });
   const card = h("div", { class: "card" }, h("h3", null, "Import into this project"),
@@ -637,7 +683,8 @@ function importPartsCard() {
     h("div", { class: "opts" },
       opt("groups", `Interface sections (${d.groups.length}) – added`),
       opt("points", `Open points (${nPts}) – added, IDs kept unique`),
-      opt("safety", `Safety concept (${d.safety.hazards.length} hazards) – replaces the current one`)),
+      opt("safety", `Safety concept (${d.safety.hazards.length} hazards) – replaces the current one`),
+      opt("nodes", `BT nodes (${d.nodes.list.length}) – added`)),
     h("div", { class: "danger-zone", style: "margin-top:10px" },
       h("button", { class: "btn primary", onclick: () => { mergeImport(pendingImport); pendingImport = null; renderAll(); } }, "Import selected"),
       h("button", { class: "btn ghost", onclick: () => { pendingImport = null; renderEditor(); } }, "Cancel")));
@@ -663,6 +710,7 @@ function mergeImport(pi) {
     msg.push(`${n} open point(s)` + (renamed ? ` (${renamed} renamed to keep IDs unique)` : ""));
   }
   if (pi.safety) { state.safety = d.safety; msg.push("the safety concept"); }
+  if (pi.nodes) { d.nodes.list.forEach(n => { n.id = uid(); n.iface = ""; ["rows", "goal", "fb", "res", "ports"].forEach(k => (n[k] || []).forEach(r => r.id = uid())); state.nodes.list.push(n); }); msg.push(`${d.nodes.list.length} BT node(s)`); }
   toast(msg.length ? "Imported " + msg.join(", ") : "Nothing selected");
 }
 
@@ -879,6 +927,7 @@ function overviewHTML(g, gi) {
 }
 function renderPreview() {
   const pv = $("#preview"); const f = find(); const d = state.doc;
+  if (sel.type === "nodes" || sel.type === "snapshot" || (sel.type === "node" && NS().list.some(x => x.id === sel.nid))) { renderCodePreview(pv); return; }
   if (sel.type === "safety") {
     pv.innerHTML = `<div class="pv-caption"><span>Preview · Safety concept</span><span class="pill">A4 · PDF</span></div><div class="paper">${safetyHTML()}</div>`;
     return;
@@ -2130,13 +2179,947 @@ function safetyPdf() {
     .getBlob(b => saveFile(slug(S.title || "safety_concept") + ".pdf", b, "application/pdf"));
 }
 
+/* ---------- BT nodes: code generator for BehaviorTree.CPP v4 + BehaviorTree.ROS2 (ROS 2 Jazzy) ---------- */
+const PATTERNS = [
+  ["compare", "Compare value", "Condition", "Blackboard value against a threshold, optionally with hysteresis."],
+  ["flag", "Check flag", "Condition", "Boolean blackboard value is true or false."],
+  ["enum", "Check enum value", "Condition", "Integer blackboard value is one of the selected constants."],
+  ["action", "Call action", "Action", "Sends an action goal. The result decides SUCCESS or FAILURE, halting the node cancels the goal."],
+  ["service", "Call service", "Action", "Calls a service. The response decides SUCCESS or FAILURE."],
+  ["publish", "Publish topic", "Action", "Fills a message from ports or constants and publishes it."],
+  ["custom", "Custom node", "Action", "Skeleton with your own ports and a TODO for the logic."],
+];
+const PAT = Object.fromEntries(PATTERNS.map(([k, l, b, d]) => [k, { label: l, base: b, desc: d }]));
+const ROS_NODE = { action: ["action_name", "server"], service: ["service_name", "server"], publish: ["topic_name", "topic"] };
+const NUM_TYPES = ["double", "float", "int", "int8_t", "uint8_t", "int16_t", "uint16_t", "int32_t", "uint32_t", "int64_t", "uint64_t"];
+const CPP_TYPES = ["double", "float", "bool", "int", "int8_t", "uint8_t", "int16_t", "uint16_t", "int32_t", "uint32_t", "int64_t", "uint64_t", "std::string"];
+const ROS_CPP = { bool: "bool", byte: "uint8_t", char: "uint8_t", int8: "int8_t", uint8: "uint8_t", int16: "int16_t", uint16: "uint16_t", int32: "int32_t", uint32: "uint32_t", int64: "int64_t", uint64: "uint64_t", float32: "float", float64: "double", string: "std::string" };
+const OPS = [["<", "<"], ["<=", "≤"], [">", ">"], [">=", "≥"], ["==", "=="], ["!=", "≠"]];
+const MISSING = [["failure", "FAILURE"], ["success", "SUCCESS"], ["throw", "throw an error"]];
+let codeFile = "";
+
+function cppOf(rosType) {
+  let t = strip(rosType).trim(); let arr = false;
+  const m = t.match(/^(.*?)\[(<=)?\d*\]$/); if (m) { arr = true; t = m[1]; }
+  t = t.replace(/^string<=\d+$/, "string");
+  let c = ROS_CPP[t];
+  if (!c) { const p = t.split("/").filter(Boolean); c = p.length === 2 ? `${p[0]}::msg::${p[1]}` : p.length === 3 ? p.join("::") : (t || "double"); }
+  return arr ? `std::vector<${c}>` : c;
+}
+const camel = s => strip(s).replace(/[^A-Za-z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join("").replace(/^(\d)/, "N$1") || "Node";
+const snake = s => String(s).replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "").toLowerCase() || "node";
+const ident = s => strip(s).trim().replace(/[^A-Za-z0-9_]/g, "_").replace(/^(\d)/, "_$1") || "value";
+const lastSeg = s => strip(s).trim().split("/").filter(Boolean).pop() || "";
+const cq = s => JSON.stringify(String(s ?? ""));
+const xq = s => esc(s).replace(/'/g, "&apos;");
+const ST = { S: "BT::NodeStatus::SUCCESS", F: "BT::NodeStatus::FAILURE", R: "BT::NodeStatus::RUNNING" };
+const IFACE_SUB = { publish: "msg", action: "action", service: "srv" };
+const IFACE_KIND = { publish: "topic", action: "action", service: "service" };
+
+function rosIface(t, sub) {
+  const p = strip(t).trim().replace(/::/g, "/").split("/").filter(Boolean);
+  if (p.length === 2) p.splice(1, 0, sub);
+  if (p.length !== 3) return null;
+  return { cpp: p.join("::"), inc: `${p[0]}/${p[1]}/${snake(p[2])}.hpp`, pkg: p[0] };
+}
+const NS = () => state.nodes;
+function emptyNodes() { return { pkg: "my_bt_nodes", ns: "my_bt_nodes", ifacePkg: "my_interfaces", tickHz: "10", serverTimeoutMs: "1000", snapshot: [], derived: [], list: [] }; }
+function normalizeNodes(n) {
+  n = Object.assign(emptyNodes(), n && typeof n === "object" ? n : {});
+  n.snapshot = (Array.isArray(n.snapshot) ? n.snapshot : []).map(e => Object.assign({ id: uid(), iface: "", type: "", topic: "", ageKey: "", rows: [] }, e));
+  n.derived = (Array.isArray(n.derived) ? n.derived : []).map(d => Object.assign({ id: uid(), key: "", type: "double", expr: "" }, d));
+  // Older versions had "Topic → Blackboard" and "Data too old" nodes: the snapshot and an age comparison replace them
+  (Array.isArray(n.list) ? n.list : []).forEach(x => {
+    if (x && x.pattern === "topic_to_bb") n.snapshot.push({ id: uid(), iface: x.iface || "", type: x.type || "", topic: x.topic || "", ageKey: x.topic ? snake(x.topic) + "_age_s" : "", rows: x.rows || [] });
+    if (x && x.pattern === "timeout") Object.assign(x, newNode("compare"), { id: x.id, name: x.name, desc: x.desc, key: String(x.key || "").replace(/_rx_time$/, "_age_s"), type: "double", op: ">", thrMode: x.maxMode === "const" ? "const" : "port", thr: x.max || "1.0", missing: x.missing || "success" });
+  });
+  n.list = (Array.isArray(n.list) ? n.list : []).filter(x => x && PAT[x.pattern]).map(x => Object.assign(newNode(x.pattern), x));
+  n.list.forEach(x => ["rows", "goal", "fb", "res", "ports"].forEach(k => (x[k] || []).forEach(r => r.id ||= uid())));
+  n.snapshot.forEach(e => e.rows.forEach(r => r.id ||= uid()));
+  return n;
+}
+function newNode(pattern) {
+  const n = { id: uid(), pattern, name: "", desc: "" };
+  const d = {
+    compare: { key: "", type: "double", op: "<", thrMode: "port", thr: "", hyst: false, clear: "", missing: "failure" },
+    flag: { key: "", equals: "true", missing: "failure" },
+    enum: { key: "", type: "uint8_t", op: "in", enumRef: "", values: [], manual: "", missing: "failure" },
+    action: { iface: "", type: "", server: "", goal: [], fb: [], res: [] },
+    service: { iface: "", type: "", server: "", goal: [], res: [] },
+    publish: { iface: "", type: "", topic: "", goal: [] },
+    custom: { base: "SyncAction", ports: [] },
+  }[pattern];
+  return Object.assign(n, JSON.parse(JSON.stringify(d)));
+}
+function uniqueName(base) { const used = new Set(NS().list.map(n => n.name)); let s = base, i = 2; while (used.has(s)) s = base + i++; return s; }
+function addNode(pattern) {
+  const n = newNode(pattern);
+  n.name = uniqueName({ compare: "ValueBelowThreshold", flag: "FlagIsSet", enum: "StateIs", timeout: "DataTooOld", topic_to_bb: "TopicToBlackboard", action: "CallAction", service: "CallService", publish: "PublishTopic", custom: "MyNode" }[pattern]);
+  NS().list.push(n); select({ type: "node", nid: n.id });
+}
+
+/* --- Spec lookups --- */
+function specItems(kind) { const out = []; state.groups.forEach(g => g.items.forEach(it => { if (!kind || it.kind === kind) out.push(it); })); return out; }
+const itemById = id => specItems().find(it => it.id === id);
+function allEnums() { const out = []; specItems().forEach(it => it.enums.forEach(en => out.push({ it, en, ref: it.id + ":" + en.id }))); return out; }
+const enumByRef = ref => allEnums().find(e => e.ref === ref);
+function findConst(name) { for (const { en } of allEnums()) { const r = en.rows.find(r => strip(r.name).trim() === name); if (r) return strip(r.value).trim(); } return null; }
+function enumConsts(n) {
+  const out = []; const seen = new Set(); const e = enumByRef(n.enumRef);
+  const push = (name, value) => { const k = name || value; if (!k || seen.has(k)) return; seen.add(k); out.push({ name, value }); };
+  (n.values || []).forEach(v => { const r = e && e.en.rows.find(r => strip(r.name).trim() === v); push(v, r ? strip(r.value).trim() : findConst(v)); });
+  String(n.manual || "").split(",").map(s => s.trim()).filter(Boolean).forEach(tok => {
+    const m = tok.match(/^([A-Za-z_]\w*)\s*=\s*(-?\d+)$/);
+    if (m) push(m[1], m[2]); else if (/^-?\d+$/.test(tok)) push(null, tok); else push(ident(tok), findConst(tok));
+  });
+  return out;
+}
+const fieldsOf = (it, sec) => (it && it.fields[sec] || []).map(f => ({ field: ident(f.name), type: strip(f.type).trim() })).filter(f => f.field && f.field !== "value");
+const isTime = t => /Time$/.test(t);
+const inRow = (f, prefix) => ({ id: uid(), on: true, field: f.field, type: f.type, mode: isTime(f.type) ? "now" : /count/.test(f.field) && /int/.test(f.type) ? "counter" : "port", value: isTime(f.type) || /count/.test(f.field) ? "" : `{${prefix ? prefix + "_" : ""}${f.field}}` });
+const outRow = (f, prefix, on) => ({ id: uid(), on: on !== undefined ? on : !isTime(f.type), field: f.field, type: f.type, key: (prefix ? prefix + "_" : "") + f.field });
+function applyIface(n, it) {
+  n.iface = it ? it.id : "";
+  if (!it) return;
+  const sub = IFACE_SUB[n.pattern]; const typeName = camel(lastSeg(it.ros) || it.name);
+  n.type = `${NS().ifacePkg || "my_interfaces"}/${sub}/${typeName}`;
+  const ros = strip(it.ros).trim();
+  const pre = snake(lastSeg(it.ros) || it.name);
+  if (n.pattern === "publish") {
+    n.topic = ros; n.name = uniqueName("Publish" + typeName);
+    n.goal = fieldsOf(it, "Message").map(f => inRow(f, ""));
+  } else if (n.pattern === "action") {
+    n.server = ros; n.name = uniqueName(camel(it.name));
+    n.goal = fieldsOf(it, "Goal").map(f => inRow(f, ""));
+    n.fb = fieldsOf(it, "Feedback").map(f => outRow(f, pre));
+    n.res = fieldsOf(it, "Result").filter(f => f.field !== "success").map(f => outRow(f, pre, f.field === "error_code"));
+  } else if (n.pattern === "service") {
+    n.server = ros; n.name = uniqueName(camel(it.name));
+    n.goal = fieldsOf(it, "Request").map(f => inRow(f, ""));
+    n.res = fieldsOf(it, "Response").filter(f => f.field !== "success").map(f => outRow(f, pre, f.field === "error_code"));
+  }
+}
+/* Blackboard keys known from the nodes that write them (key → C++ type) */
+function bbKeys() {
+  const m = new Map();
+  NS().snapshot.forEach(e => { e.rows.filter(r => r.on && r.key).forEach(r => m.set(r.key, cppOf(r.type))); if (e.ageKey) m.set(e.ageKey, "double"); });
+  NS().derived.filter(d => d.key).forEach(d => m.set(d.key, d.type || "double"));
+  NS().list.forEach(n => {
+    if (n.pattern === "action") [...n.fb, ...n.res].filter(r => r.on && r.key).forEach(r => m.set(r.key, cppOf(r.type)));
+    if (n.pattern === "service") n.res.filter(r => r.on && r.key).forEach(r => m.set(r.key, cppOf(r.type)));
+    if (n.pattern === "custom") n.ports.filter(p => p.dir === "out" && p.name).forEach(p => m.set(p.def ? p.def.replace(/[{}]/g, "") : p.name, p.type || "double"));
+  });
+  return m;
+}
+
+/* --- Ports: one description used for the header and the Groot2 model --- */
+function nodePorts(n) {
+  const P = []; const used = new Set();
+  const add = (dir, name, type, def, desc) => { let nm = ident(name); if (used.has(nm)) nm = (dir === "in" ? "in_" : "out_") + nm; used.add(nm); P.push({ dir, name: nm, type, def, desc }); return nm; };
+  const N = ident;
+  switch (n.pattern) {
+    case "compare":
+      add("in", n.key || "value", n.type, `{${N(n.key || "value")}}`, "Value to check");
+      if (n.thrMode === "port") {
+        add("in", "threshold", n.type, n.thr, `Active when the value ${n.op} threshold`);
+        if (n.hyst && hystOk(n)) add("in", "clear_threshold", n.type, n.clear, "Stays active until the value is back past this value");
+      }
+      break;
+    case "flag": add("in", n.key || "flag", "bool", `{${N(n.key || "flag")}}`, "Flag to check"); break;
+    case "enum": add("in", n.key || "state", n.type, `{${N(n.key || "state")}}`, "Value to check"); break;
+    case "action": case "service": case "publish":
+      n.goal.filter(r => r.on && r.field && r.mode === "port").forEach(r => r.port = add("in", r.field, cppOf(r.type), r.value, `Sets ${r.field}`));
+      (n.fb || []).filter(r => r.on && r.field).forEach(r => r.port = add("out", r.field, cppOf(r.type), `{${N(r.key || r.field)}}`, `${r.field} from the feedback`));
+      (n.res || []).filter(r => r.on && r.field).forEach(r => r.port = add("out", r.field, cppOf(r.type), `{${N(r.key || r.field)}}`, `${r.field} from the ${n.pattern === "service" ? "response" : "result"}`));
+      break;
+    case "custom": n.ports.filter(p => p.name).forEach(p => p.port = add(p.dir, p.name, p.type || "double", p.def, p.desc || "")); break;
+  }
+  return P;
+}
+const hystOk = n => ["<", "<=", ">", ">="].includes(n.op);
+function portDecl(p) {
+  const fn = p.dir === "in" ? "InputPort" : "OutputPort";
+  const def = String(p.def ?? "").trim();
+  if (def === "") return `BT::${fn}<${p.type}>(${cq(p.name)}, ${cq(p.desc)})`;
+  return `BT::${fn}<${p.type}>(${cq(p.name)}, ${p.dir === "in" ? defaultExpr(def, p.type) : cq(def)}, ${cq(p.desc)})`;
+}
+/* Input-port defaults: blackboard references and strings as std::string (a char array would turn into true for bool ports), numbers as literals */
+function defaultExpr(def, type) {
+  if (/^\{.*\}$/.test(def)) return `std::string(${cq(def)})`;
+  if (type === "bool") return /^(true|1)$/i.test(def) ? "true" : "false";
+  if (NUM_TYPES.includes(type) && /^-?\d+(\.\d+)?([eE]-?\d+)?$/.test(def)) return `${type}(${def})`;
+  return `std::string(${cq(def.replace(/^"|"$/g, ""))})`;
+}
+function portsBlock(P, basic) {
+  const list = P.map(p => "      " + portDecl(p)).join(",\n");
+  if (basic) return `  static BT::PortsList providedPorts()\n  {\n    return providedBasicPorts({\n${list}${list ? "\n" : ""}    });\n  }\n`;
+  return `  static BT::PortsList providedPorts()\n  {\n    return {\n${list}${list ? "\n" : ""}    };\n  }\n`;
+}
+function cppLit(v, type) {
+  v = String(v ?? "").trim();
+  if (type === "std::string") return cq(v.replace(/^"|"$/g, ""));
+  if (type === "bool") return /^(true|1)$/i.test(v) ? "true" : "false";
+  return v === "" ? "0" : v;
+}
+function missingCode(n, varName, portName, ind) {
+  const i = " ".repeat(ind);
+  if (n.missing === "throw") return `${i}throw BT::RuntimeError("${n.name}: missing input [${portName}]: ", ${varName}.error());\n`;
+  return `${i}return ${n.missing === "success" ? ST.S : ST.F};  // input [${portName}] not set\n`;
+}
+const docComment = (n, extra) => {
+  const lines = [n.desc && strip(n.desc).trim(), extra].filter(Boolean).join("\n").split("\n");
+  return lines.map(l => "/// " + l).join("\n") + "\n";
+};
+
+/* --- Header generation --- */
+function genNode(n) {
+  const N = NS(); const ns = ident(N.ns || N.pkg); const cls = camel(n.name); const P = nodePorts(n);
+  const inc = new Set(); let base, body = "", members = "", kind = PAT[n.pattern].base, summary = "", basic = false;
+  const getIn = (p, ind = 4) => { const v = p.name; return `${" ".repeat(ind)}const auto ${v} = getInput<${p.type}>(${cq(p.name)});\n`; };
+  const pIn = name => P.find(p => p.dir === "in" && p.name === name);
+  switch (n.pattern) {
+    case "compare": {
+      inc.add("behaviortree_cpp/condition_node.h"); base = "BT::ConditionNode";
+      const v = P[0]; const T = n.type; const hy = n.hyst && hystOk(n);
+      let thr, clr;
+      if (n.thrMode === "port") { thr = `getInput<${T}>("threshold").value()`; clr = `getInput<${T}>("clear_threshold").value()`; }
+      else { members += `  static constexpr ${T} kThreshold = ${cppLit(n.thr, T)};\n`; if (hy) members += `  static constexpr ${T} kClearThreshold = ${cppLit(n.clear, T)};\n`; thr = "kThreshold"; clr = "kClearThreshold"; }
+      body += getIn(v) + `    if (!${v.name}) {\n` + missingCode(n, v.name, v.name, 6) + "    }\n";
+      body += `    const ${T} threshold = ${thr};\n`;
+      if (hy) {
+        const back = n.op.startsWith("<") ? "<" : ">";
+        body += `    const ${T} clear_threshold = ${clr};\n`;
+        body += `    // Hysteresis: once active, stay active while the value ${back} clear_threshold\n`;
+        body += `    active_ = active_ ? (*${v.name} ${back} clear_threshold) : (*${v.name} ${n.op} threshold);\n`;
+        body += `    return active_ ? ${ST.S} : ${ST.F};\n`;
+        members += "  bool active_ = false;\n";
+      } else body += `    return (*${v.name} ${n.op} threshold) ? ${ST.S} : ${ST.F};\n`;
+      summary = `SUCCESS while ${v.name} ${n.op} threshold${hy ? " (with hysteresis)" : ""}, otherwise FAILURE.`;
+      break;
+    }
+    case "flag": {
+      inc.add("behaviortree_cpp/condition_node.h"); base = "BT::ConditionNode"; const v = P[0];
+      body += getIn(v) + `    if (!${v.name}) {\n` + missingCode(n, v.name, v.name, 6) + "    }\n";
+      body += `    return ${n.equals === "true" ? "" : "!"}*${v.name} ? ${ST.S} : ${ST.F};\n`;
+      summary = `SUCCESS if ${v.name} is ${n.equals}, otherwise FAILURE.`;
+      break;
+    }
+    case "enum": {
+      inc.add("behaviortree_cpp/condition_node.h"); base = "BT::ConditionNode"; const v = P[0]; const T = n.type;
+      const cs = enumConsts(n);
+      cs.filter(c => c.name).forEach(c => members += `  static constexpr ${T} ${c.name} = ${c.value ?? "0 /* TODO: value not found in the spec */"};\n`);
+      const refs = cs.map(c => c.name || c.value);
+      body += getIn(v) + `    if (!${v.name}) {\n` + missingCode(n, v.name, v.name, 6) + "    }\n";
+      let cond;
+      if (!refs.length) cond = "false /* TODO: select values */";
+      else if (n.op === "in") cond = refs.map(r => `*${v.name} == ${r}`).join(" || ");
+      else if (n.op === "not_in") cond = refs.map(r => `*${v.name} != ${r}`).join(" && ");
+      else cond = `*${v.name} ${n.op === "ge" ? ">=" : "<="} ${refs[0]}`;
+      body += `    return (${cond}) ? ${ST.S} : ${ST.F};\n`;
+      const opTxt = { in: "is one of", not_in: "is none of", ge: "is at least", le: "is at most" }[n.op];
+      summary = `SUCCESS if ${v.name} ${opTxt} ${refs.join(", ") || "…"}, otherwise FAILURE.`;
+      break;
+    }
+    case "action": {
+      const t = rosIface(n.type, "action") || { cpp: "TODO_pkg::action::TODO_Type", inc: "TODO_pkg/action/todo_type.hpp" };
+      inc.add("behaviortree_ros2/bt_action_node.hpp"); inc.add(t.inc); basic = true; base = `BT::RosActionNode<${t.cpp}>`;
+      const it = itemById(n.iface); const resF = it ? fieldsOf(it, "Result") : [];
+      const hasSuccess = resF.some(f => f.field === "success"); const hasMsg = resF.some(f => f.field === "message");
+      const fill = fillCode(n, "goal.", `${t.cpp}::Goal`);
+      body = `  bool setGoal(Goal& goal) override\n  {\n` + (fill || "    (void)goal;\n") + "    return true;\n  }\n\n";
+      body += `  BT::NodeStatus onResultReceived(const WrappedResult& wr) override\n  {\n`;
+      n.res.filter(r => r.on && r.field).forEach(r => body += `    setOutput(${cq(r.port)}, wr.result->${r.field});\n`);
+      if (hasSuccess) {
+        if (hasMsg) body += `    if (!wr.result->success) {\n      RCLCPP_WARN(logger(), "%s failed: %s", name().c_str(), wr.result->message.c_str());\n    }\n`;
+        body += `    return wr.result->success ? ${ST.S} : ${ST.F};\n  }\n\n`;
+      } else body += `    return ${ST.S};\n  }\n\n`;
+      if (n.fb.some(r => r.on && r.field)) {
+        body += `  BT::NodeStatus onFeedback(const std::shared_ptr<const Feedback> feedback) override\n  {\n`;
+        n.fb.filter(r => r.on && r.field).forEach(r => body += `    setOutput(${cq(r.port)}, feedback->${r.field});\n`);
+        body += `    return ${ST.R};\n  }\n\n`;
+      }
+      const resOut = n.res.filter(r => r.on && r.field);
+      body += `  // Aborted or canceled goals (e.g. preempted by another client) end up here, not in onResultReceived()\n`;
+      body += `  BT::NodeStatus onFailure(BT::ActionNodeErrorCode error, const std::optional<WrappedResult>& wr) override\n  {\n`;
+      if (resOut.length) body += `    if (wr && wr->result) {\n` + resOut.map(r => `      setOutput(${cq(r.port)}, wr->result->${r.field});\n`).join("") + "    }\n";
+      else body += "    (void)wr;\n";
+      body += `    return onFailure(error);\n  }\n\n`;
+      body += `  BT::NodeStatus onFailure(BT::ActionNodeErrorCode error) override\n  {\n    RCLCPP_ERROR(logger(), "%s: %s", name().c_str(), BT::toStr(error));\n    return ${ST.F};\n  }\n`;
+      summary = `Sends a goal to [action_name]. ${hasSuccess ? "SUCCESS if result.success is true." : "SUCCESS if the goal succeeded."} FAILURE if it was rejected, aborted or canceled. Halting the node cancels the goal.`;
+      break;
+    }
+    case "service": {
+      const t = rosIface(n.type, "srv") || { cpp: "TODO_pkg::srv::TODO_Type", inc: "TODO_pkg/srv/todo_type.hpp" };
+      inc.add("behaviortree_ros2/bt_service_node.hpp"); inc.add(t.inc); basic = true; base = `BT::RosServiceNode<${t.cpp}>`;
+      const it = itemById(n.iface); const resF = it ? fieldsOf(it, "Response") : [];
+      const hasSuccess = resF.some(f => f.field === "success"); const hasMsg = resF.some(f => f.field === "message");
+      const fill = fillCode(n, "request->", `${t.cpp}::Request`);
+      body = `  bool setRequest(Request::SharedPtr& request) override\n  {\n` + (fill || "    (void)request;\n") + "    return true;\n  }\n\n";
+      body += `  BT::NodeStatus onResponseReceived(const Response::SharedPtr& response) override\n  {\n`;
+      if (!hasSuccess && !n.res.some(r => r.on && r.field)) body += "    (void)response;\n";
+      n.res.filter(r => r.on && r.field).forEach(r => body += `    setOutput(${cq(r.port)}, response->${r.field});\n`);
+      if (hasSuccess) {
+        if (hasMsg) body += `    if (!response->success) {\n      RCLCPP_WARN(logger(), "%s failed: %s", name().c_str(), response->message.c_str());\n    }\n`;
+        body += `    return response->success ? ${ST.S} : ${ST.F};\n  }\n\n`;
+      } else body += `    return ${ST.S};\n  }\n\n`;
+      body += `  BT::NodeStatus onFailure(BT::ServiceNodeErrorCode error) override\n  {\n    RCLCPP_ERROR(logger(), "%s: %s", name().c_str(), BT::toStr(error));\n    return ${ST.F};\n  }\n`;
+      summary = `Calls [service_name]. ${hasSuccess ? "SUCCESS if response.success is true." : "SUCCESS when a response arrives."}`;
+      break;
+    }
+    case "publish": {
+      const t = rosIface(n.type, "msg") || { cpp: "TODO_pkg::msg::TODO_Type", inc: "TODO_pkg/msg/todo_type.hpp" };
+      inc.add("behaviortree_ros2/bt_topic_pub_node.hpp"); inc.add(t.inc); basic = true; base = `BT::RosTopicPubNode<${t.cpp}>`;
+      const fill = fillCode(n, "msg.", t.cpp, true);
+      body = `  bool setMessage(${t.cpp}& msg) override\n  {\n` + (fill || "    (void)msg;\n") + "    return true;\n  }\n";
+      if (n.goal.some(r => r.on && r.mode === "counter")) members += "  uint64_t counter_ = 0;\n";
+      summary = "Publishes one message on [topic_name] per tick and returns SUCCESS.";
+      break;
+    }
+    case "custom": {
+      const B = { Condition: ["behaviortree_cpp/condition_node.h", "BT::ConditionNode"], SyncAction: ["behaviortree_cpp/action_node.h", "BT::SyncActionNode"], StatefulAction: ["behaviortree_cpp/action_node.h", "BT::StatefulActionNode"] }[n.base] || ["behaviortree_cpp/action_node.h", "BT::SyncActionNode"];
+      inc.add(B[0]); base = B[1]; kind = n.base === "Condition" ? "Condition" : "Action";
+      const reads = P.filter(p => p.dir === "in").map(p => getIn(p) + `    if (!${p.name}) {\n      throw BT::RuntimeError("${n.name}: missing input [${p.name}]: ", ${p.name}.error());\n    }\n`).join("");
+      const writes = P.filter(p => p.dir === "out").map(p => `    // setOutput(${cq(p.name)}, value);\n`).join("");
+      if (n.base === "StatefulAction") {
+        body = `  BT::NodeStatus onStart() override\n  {\n${reads}    // TODO: start the work\n    return ${ST.R};\n  }\n\n` +
+          `  BT::NodeStatus onRunning() override\n  {\n    // TODO: check progress, return SUCCESS or FAILURE when done\n${writes}    return ${ST.R};\n  }\n\n` +
+          `  void onHalted() override\n  {\n    // TODO: stop the work\n  }\n`;
+      } else body = `  BT::NodeStatus tick() override\n  {\n${reads}    // TODO: implement\n${writes}    return ${ST.S};\n  }\n`;
+      summary = "Custom logic.";
+      break;
+    }
+  }
+  if (!["topic_to_bb", "action", "service", "publish", "custom"].includes(n.pattern) || (n.pattern === "custom" && n.base !== "StatefulAction")) {
+    if (!/tick\(\) override/.test(body)) body = `  BT::NodeStatus tick() override\n  {\n${body}  }\n`;
+  }
+  const ros = !!ROS_NODE[n.pattern];
+  const ctor = ros
+    ? `  ${cls}(const std::string& name, const BT::NodeConfig& config, const BT::RosNodeParams& params)\n  : ${base}(name, config, params)\n  {}\n`
+    : `  ${cls}(const std::string& name, const BT::NodeConfig& config)\n  : ${base}(name, config)\n  {}\n`;
+  const incs = ["string", ...[...inc]].map(x => x === "string" ? "#include <string>" : x.startsWith(N.pkg + "/") ? `#include "${x}"` : `#include <${x}>`);
+  const hpp = `// Generated by Interface Spec Builder. Pattern: ${PAT[n.pattern].label}.\n// Add your own logic freely; regenerating overwrites this file.\n#pragma once\n\n${incs.join("\n")}\n\nnamespace ${ns}\n{\n\n` +
+    docComment(n, summary) + `class ${cls} : public ${base}\n{\npublic:\n${ctor}\n${portsBlock(P, basic)}\n${body}` + (members ? `\nprivate:\n${members}` : "") + `};\n\n}  // namespace ${ns}\n`;
+  return { cls, file: `include/${N.pkg}/${snake(cls)}.hpp`, hpp, ports: P, kind, ros, node: n };
+}
+function fillCode(n, prefix, typeCpp, pub) {
+  const lg = pub ? "node_->get_logger()" : "logger()";
+  let s = "";
+  n.goal.filter(r => r.on && r.field).forEach(r => {
+    const T = cppOf(r.type);
+    if (r.mode === "port") s += `    const auto ${r.port} = getInput<${T}>(${cq(r.port)});\n    if (!${r.port}) {\n      RCLCPP_ERROR(${lg}, "%s: missing input [${r.port}]: %s", name().c_str(), ${r.port}.error().c_str());\n      return false;\n    }\n    ${prefix}${r.field} = *${r.port};\n`;
+    else if (r.mode === "now") s += `    ${prefix}${r.field} = ${pub ? "node_->now()" : "rclcpp::Clock().now()"};\n`;
+    else if (r.mode === "counter") s += `    ${prefix}${r.field} = static_cast<${T}>(++counter_);\n`;
+    else { const v = String(r.value ?? "").trim(); s += `    ${prefix}${r.field} = ${/^[A-Z][A-Z0-9_]+$/.test(v) && T !== "std::string" ? typeCpp + "::" + v : cppLit(v, T)};\n`; }
+  });
+  return s;
+}
+
+/* --- Package files --- */
+function packageFiles() {
+  const N = NS(); const ns = ident(N.ns || N.pkg); const gens = N.list.map(genNode);
+  const ifacePkgs = new Set(); N.snapshot.forEach(e => { const t = rosIface(e.type, "msg"); if (t) ifacePkgs.add(t.pkg); });
+  N.list.forEach(n => { const sub = IFACE_SUB[n.pattern]; if (!sub) return; const t = rosIface(n.type, sub); if (t) ifacePkgs.add(t.pkg); });
+  const deps = ["rclcpp", "rclcpp_action", "ament_index_cpp", "behaviortree_cpp", "behaviortree_ros2", ...[...ifacePkgs].sort()];
+  const files = [];
+  files.push({ name: `include/${N.pkg}/register_nodes.hpp`, lang: "cpp", text: registerCode(gens) });
+  files.push({ name: "trees/main_tree.xml", lang: "xml", text: mainTreeXml(gens) });
+  files.push({ name: "src/bt_runner.cpp", lang: "cpp", text: runnerCode() });
+  gens.forEach(g => files.push({ name: g.file, lang: "cpp", text: g.hpp }));
+  files.push({ name: `include/${N.pkg}/snapshot.hpp`, lang: "cpp", text: snapshotCode() });
+  files.push({ name: "trees/nodes_model.xml", lang: "xml", text: `<?xml version="1.0" encoding="UTF-8"?>\n<root BTCPP_format="4">\n${modelXml(gens)}</root>\n` });
+  files.push({ name: "config/params.yaml", lang: "yaml", text: `/**:\n  ros__parameters:\n    tick_rate_hz: ${Number(N.tickHz) || 10}.0\n    tree_file: ""          # empty = share/${N.pkg}/trees/main_tree.xml\n    groot_port: 1667\n`.replace(/(\d+\.\d+)\.0/, "$1") });
+  files.push({ name: "CMakeLists.txt", lang: "cmake", text: cmakeCode(deps) });
+  files.push({ name: "package.xml", lang: "xml", text: packageXml(deps) });
+  files.push({ name: "README.md", lang: "md", text: readmeCode() });
+  return files;
+}
+function registerCode(gens) {
+  const N = NS(); const ns = ident(N.ns || N.pkg); const t = Number(N.serverTimeoutMs) || 1000;
+  let s = `// Generated by Interface Spec Builder.\n#pragma once\n\n#include <memory>\n\n#include <behaviortree_cpp/bt_factory.h>\n#include <behaviortree_ros2/ros_node_params.hpp>\n#include <rclcpp/rclcpp.hpp>\n\n`;
+  s += gens.map(g => `#include "${g.file.replace(/^include\//, "")}"`).join("\n") + (gens.length ? "\n" : "");
+  s += `\nnamespace ${ns}\n{\n\ninline void registerNodes(BT::BehaviorTreeFactory& factory, const rclcpp::Node::SharedPtr& node)\n{\n`;
+  if (!gens.length) s += "  (void)factory;\n  (void)node;\n";
+  gens.forEach(g => s += registerOne(g.node, g, t));
+  return s + `}\n\n}  // namespace ${ns}\n`;
+}
+function registerOne(n, g, t) {
+  if (!g.ros) return `  factory.registerNodeType<${g.cls}>(${cq(g.cls)});\n`;
+  const def = strip(n[ROS_NODE[n.pattern][1]]).trim();
+  let s = `  {\n    BT::RosNodeParams params;\n    params.nh = node;\n    params.default_port_value = ${cq(def)};\n`;
+  if (n.pattern === "action" || n.pattern === "service") s += `    params.server_timeout = std::chrono::milliseconds(${t});\n    params.wait_for_server_timeout = std::chrono::milliseconds(${t});\n`;
+  return s + `    factory.registerNodeType<${g.cls}>(${cq(g.cls)}, params);\n  }\n`;
+}
+function runnerCode() {
+  const N = NS(); const ns = ident(N.ns || N.pkg);
+  return `// Generated by Interface Spec Builder.
+#include <memory>
+#include <string>
+
+#include <ament_index_cpp/get_package_share_directory.hpp>
+#include <behaviortree_cpp/bt_factory.h>
+#include <behaviortree_cpp/loggers/groot2_publisher.h>
+#include <rclcpp/rclcpp.hpp>
+
+#include "${N.pkg}/register_nodes.hpp"
+#include "${N.pkg}/snapshot.hpp"
+
+int main(int argc, char** argv)
+{
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<rclcpp::Node>("${N.pkg}");
+
+  auto tree_file = node->declare_parameter<std::string>("tree_file", "");
+  const double tick_rate_hz = node->declare_parameter<double>("tick_rate_hz", ${(Number(N.tickHz) || 10).toFixed(1)});
+  const int groot_port = node->declare_parameter<int>("groot_port", 1667);
+  if (tree_file.empty()) {
+    tree_file = ament_index_cpp::get_package_share_directory("${N.pkg}") + "/trees/main_tree.xml";
+  }
+
+  // Subscribes to all input topics (see snapshot.hpp)
+  ${ns}::Snapshot snapshot(node);
+
+  BT::BehaviorTreeFactory factory;
+  ${ns}::registerNodes(factory, node);
+  factory.registerBehaviorTreeFromFile(tree_file);
+  auto tree = factory.createTree("MainTree");
+
+  // Live view of the running tree in Groot2
+  BT::Groot2Publisher groot(tree, static_cast<unsigned>(groot_port));
+
+  rclcpp::Rate rate(tick_rate_hz);
+  while (rclcpp::ok()) {
+    rclcpp::spin_some(node);                // callbacks store the latest messages
+    snapshot.write(tree.rootBlackboard());  // one consistent snapshot per tick
+    tree.tickOnce();
+    rate.sleep();
+  }
+  tree.haltTree();
+  rclcpp::shutdown();
+  return 0;
+}
+`;
+}
+function modelXml(gens) {
+  let s = "  <TreeNodesModel>\n";
+  gens.forEach(g => {
+    const n = g.node; const tag = g.kind === "Condition" ? "Condition" : "Action";
+    s += `    <${tag} ID="${xq(g.cls)}">\n`;
+    if (g.ros) { const [pn, k] = ROS_NODE[n.pattern]; s += `      <input_port name="${pn}" type="std::string" default="${xq(strip(n[k]).trim())}">ROS ${pn.replace("_name", "")} name</input_port>\n`; }
+    g.ports.forEach(p => { const d = String(p.def ?? "").trim(); s += `      <${p.dir === "in" ? "input" : "output"}_port name="${xq(p.name)}" type="${xq(p.type)}"${d ? ` default="${xq(d)}"` : ""}>${esc(p.desc)}</${p.dir === "in" ? "input" : "output"}_port>\n`; });
+    s += `    </${tag}>\n`;
+  });
+  return s + "  </TreeNodesModel>\n";
+}
+function mainTreeXml(gens) {
+  let s = `<?xml version="1.0" encoding="UTF-8"?>\n<root BTCPP_format="4" main_tree_to_execute="MainTree">\n  <BehaviorTree ID="MainTree">\n    <Sequence>\n`;
+  s += "      <!-- The snapshot fills the blackboard before every tick. Build the tree in Groot2. -->\n      <AlwaysSuccess/>\n    </Sequence>\n  </BehaviorTree>\n\n";
+  return s + "  <!-- Description of the custom nodes for Groot2 -->\n" + modelXml(gens) + "</root>\n";
+}
+function cmakeCode(deps) {
+  const N = NS();
+  return `cmake_minimum_required(VERSION 3.16)
+project(${N.pkg})
+
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+endif()
+
+find_package(ament_cmake REQUIRED)
+${deps.map(d => `find_package(${d} REQUIRED)`).join("\n")}
+
+# All nodes are header-only; only the runner is compiled.
+add_executable(bt_runner src/bt_runner.cpp)
+target_include_directories(bt_runner PRIVATE
+  $<BUILD_INTERFACE:\${CMAKE_CURRENT_SOURCE_DIR}/include>)
+ament_target_dependencies(bt_runner
+  ${deps.join("\n  ")})
+
+install(TARGETS bt_runner DESTINATION lib/\${PROJECT_NAME})
+install(DIRECTORY include/ DESTINATION include)
+install(DIRECTORY trees config DESTINATION share/\${PROJECT_NAME})
+
+ament_package()
+`;
+}
+function packageXml(deps) {
+  const N = NS();
+  return `<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>${xq(N.pkg)}</name>
+  <version>0.1.0</version>
+  <description>Behavior tree nodes generated by Interface Spec Builder</description>
+  <maintainer email="todo@todo.todo">TODO</maintainer>
+  <license>TODO</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+${deps.map(d => `  <depend>${d}</depend>`).join("\n")}
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
+`;
+}
+function readmeCode() {
+  const N = NS();
+  return `# ${N.pkg}
+
+Behavior tree nodes for BehaviorTree.CPP v4 and BehaviorTree.ROS2, generated by Interface Spec Builder for ROS 2 Jazzy.
+
+## Build
+
+\`\`\`bash
+cd ~/ros2_ws/src
+# BehaviorTree.ROS2 is built from source if it is not installed as a binary package
+git clone https://github.com/BehaviorTree/BehaviorTree.ROS2.git
+# copy this package next to it, then:
+cd ~/ros2_ws
+rosdep install --from-paths src --ignore-src -y
+colcon build --packages-up-to ${N.pkg}
+\`\`\`
+
+## Run
+
+\`\`\`bash
+ros2 run ${N.pkg} bt_runner --ros-args --params-file install/${N.pkg}/share/${N.pkg}/config/params.yaml
+\`\`\`
+
+## Edit the tree
+
+Open \`trees/main_tree.xml\` in Groot2. The custom nodes and their ports are listed there.
+While \`bt_runner\` is running, Groot2 can connect to it (port 1667) and show the tree live.
+
+## Structure
+
+- \`include/${N.pkg}/*.hpp\` – one header per node
+- \`include/${N.pkg}/snapshot.hpp\` – subscribes to the input topics and writes them to the blackboard before every tick
+- \`include/${N.pkg}/register_nodes.hpp\` – registers all nodes with the factory
+- \`src/bt_runner.cpp\` – loads the tree and ticks it at \`tick_rate_hz\`
+- Conditions only read the blackboard. Every topic also gets an \`<topic>_age_s\` key (infinity before the first message) for timeout checks.
+`;
+}
+
+/* --- ZIP (stored, no compression) --- */
+function crc32(bytes) {
+  let t = crc32.t;
+  if (!t) { t = crc32.t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } }
+  let c = 0xFFFFFFFF; for (let i = 0; i < bytes.length; i++) c = t[(c ^ bytes[i]) & 255] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function makeZip(files) {
+  const enc = new TextEncoder(); const parts = [], central = []; let offset = 0;
+  const d = new Date(); const tm = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1); const dt = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  files.forEach(f => {
+    const name = enc.encode(f.name), data = enc.encode(f.text), crc = crc32(data);
+    const lh = new DataView(new ArrayBuffer(30));
+    [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [8, 0, 2], [10, tm, 2], [12, dt, 2], [14, crc, 4], [18, data.length, 4], [22, data.length, 4], [26, name.length, 2], [28, 0, 2]]
+      .forEach(([o, v, n]) => n === 4 ? lh.setUint32(o, v, true) : lh.setUint16(o, v, true));
+    parts.push(new Uint8Array(lh.buffer), name, data);
+    const ch = new DataView(new ArrayBuffer(46));
+    [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [10, 0, 2], [12, tm, 2], [14, dt, 2], [16, crc, 4], [20, data.length, 4], [24, data.length, 4], [28, name.length, 2], [30, 0, 2], [32, 0, 2], [34, 0, 2], [36, 0, 2], [38, 0, 4], [42, offset, 4]]
+      .forEach(([o, v, n]) => n === 4 ? ch.setUint32(o, v, true) : ch.setUint16(o, v, true));
+    central.push(new Uint8Array(ch.buffer), name);
+    offset += 30 + name.length + data.length;
+  });
+  const size = central.reduce((a, b) => a + b.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true); end.setUint32(12, size, true); end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: "application/zip" });
+}
+function downloadPackage() {
+  const N = NS(); const files = packageFiles().map(f => ({ name: `${N.pkg}/${f.name}`, text: f.text }));
+  saveFile(`${N.pkg}.zip`, makeZip(files), "application/zip");
+  toast(`${files.length} files packed`);
+}
+
+/* --- Conditions from the hazard checks of the safety concept --- */
+function nodesFromHazards() {
+  const used = new Set(NS().list.map(n => n.name)); const known = bbKeys(); let added = 0;
+  SP().hazards.forEach(x => {
+    const r = normRule(x.rule); if (!["threshold", "flag", "enum_at_least", "timeout"].includes(r.type)) return;
+    const name = camel(x.key || x.name); if (used.has(name)) return;
+    let n;
+    if (r.type === "threshold") { n = newNode("compare"); Object.assign(n, { key: r.signal, op: r.dir === "below" ? "<" : ">", thr: r.enter, hyst: String(r.clear).trim() !== "", clear: r.clear, type: NUM_TYPES.includes(known.get(r.signal)) ? known.get(r.signal) : "double" }); }
+    else if (r.type === "flag") { n = newNode("flag"); Object.assign(n, { key: r.signal, equals: r.equals }); }
+    else if (r.type === "enum_at_least") {
+      n = newNode("enum"); Object.assign(n, { key: r.signal, op: "ge" });
+      const e = allEnums().find(e => e.en.rows.some(row => strip(row.name).trim() === r.value));
+      if (e) { n.enumRef = e.ref; n.values = [r.value]; } else n.manual = r.value;
+      if (known.get(r.signal)) n.type = known.get(r.signal);
+    } else { n = newNode("compare"); Object.assign(n, { key: snake(r.topic) + "_age_s", op: ">", thr: r.max_age_s, missing: "success" }); ensureSnapTopic(strip(r.topic).trim()); }
+    if (r.signal) ensureSignal(r.signal);
+    n.name = name; n.desc = `Hazard: ${strip(x.name)}`;
+    if (r.type !== "timeout") n.missing = x.onMissing === "active" ? "success" : "failure";
+    if (r.type === "threshold" || r.type === "enum_at_least") { const t = bbKeys().get(r.signal); if (NUM_TYPES.includes(t)) n.type = t; }
+    NS().list.push(n); used.add(name); added++;
+  });
+  renderAll(); toast(added ? `${added} condition node(s) created from hazard checks` : "No new hazard checks found (only checks with a type and not yet created)");
+}
+
+/* --- Navigation & editors --- */
+const CODE_ICON = '<svg viewBox="0 0 22 22" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 6l-5 5 5 5M14 6l5 5-5 5"/></svg>';
+function nodesNav() {
+  const N = NS();
+  const list = h("div", { class: "nav-list" });
+  N.list.forEach(n => list.append(h("button", { class: "nav-item", "aria-current": String(sel.type === "node" && sel.nid === n.id), onclick: () => select({ type: "node", nid: n.id }) },
+    h("span", { class: "kind " + (PAT[n.pattern].base === "Condition" && !(n.pattern === "custom" && n.base !== "Condition") ? "topic" : "action"), title: PAT[n.pattern].base }, (n.pattern === "custom" ? (n.base === "Condition" ? "C" : "A") : PAT[n.pattern].base[0])),
+    h("span", { class: "t" }, h("b", null, camel(n.name)), h("small", null, PAT[n.pattern].label)))));
+  list.append(h("div", { class: "add-row" }, h("button", { class: "btn ghost small", onclick: () => { select({ type: "nodes" }); requestAnimationFrame(() => { const g = $("#pattern-gallery"); if (g) g.scrollIntoView({ block: "start" }); }); } }, "+ Node")));
+  return [h("h4", null, "BT nodes"),
+    h("button", { class: "nav-item", "aria-current": String(sel.type === "nodes"), onclick: () => select({ type: "nodes" }) },
+      h("span", { class: "rv-ring", html: CODE_ICON, style: "color:var(--accent)" }),
+      h("span", { class: "t" }, h("b", null, N.pkg || "Package"), h("small", null, `${N.list.length} nodes · BehaviorTree.ROS2`))),
+    h("button", { class: "nav-item", "aria-current": String(sel.type === "snapshot"), onclick: () => select({ type: "snapshot" }) },
+      h("span", { class: "kind topic", title: "Inputs" }, "S"),
+      h("span", { class: "t" }, h("b", null, "Snapshot"), h("small", null, `${N.snapshot.length} topics → blackboard`))),
+    list];
+}
+function nodesHome() {
+  const N = NS(); const nHz = SP().hazards.filter(x => normRule(x.rule).type !== "none").length;
+  return [
+    h("div", { class: "ed-head" }, h("div", null, h("div", { class: "crumb" }, "Code · BehaviorTree.ROS2 · ROS 2 Jazzy"), h("h2", null, "BT nodes")),
+      h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: downloadPackage }, "Download package (ZIP)"))),
+    h("div", { class: "card" }, h("h3", null, "Package"),
+      h("div", { class: "grid" },
+        labeled("ROS 2 package name", bound(N, "pkg", { mono: true, ph: "safety_bt_nodes" })),
+        labeled("C++ namespace", bound(N, "ns", { mono: true, ph: "safety_bt_nodes" })),
+        labeled("Default interface package (for new nodes)", bound(N, "ifacePkg", { mono: true, ph: "my_interfaces" })),
+        labeled("Tick rate (Hz)", bound(N, "tickHz", { mono: true, ph: "10" })),
+        labeled("Action/service server timeout (ms)", bound(N, "serverTimeoutMs", { mono: true, ph: "1000" }))),
+      h("p", { class: "hint", style: "margin:10px 0 0" }, "Generates header-only nodes, their registration, a runner with Groot2 live view, CMakeLists.txt, package.xml and a tree file you can open in Groot2.")),
+    h("div", { class: "card", id: "pattern-gallery" }, h("h3", null, "Add a node"),
+      h("div", { class: "pat-grid" }, PATTERNS.map(([k, l, b, d]) => h("button", { class: "pat", onclick: () => addNode(k) },
+        h("span", { class: "pat-h" }, h("b", null, l), h("span", { class: "chip" }, b)), h("span", { class: "hint" }, d)))),
+      h("div", { class: "danger-zone", style: "margin-top:12px" },
+        h("button", { class: "btn", disabled: !nHz, onclick: nodesFromHazards, title: "One condition node per hazard with a machine-readable check" }, `Create conditions from hazard checks (${nHz})`))),
+    h("div", { class: "card" }, h("h3", null, "How the pieces fit"),
+      h("ol", { class: "rules" },
+        h("li", null, "The snapshot subscribes to the input topics. Right before every tick it writes the latest values and the age of each topic to the blackboard."),
+        h("li", null, "Conditions only read the blackboard. Thresholds as ports can be changed in the tree XML or in Groot2 without recompiling."),
+        h("li", null, "Action nodes send goals. When a reactive parent halts them, BehaviorTree.ROS2 cancels the goal."),
+        h("li", null, "Download the package, build it with colcon and arrange the tree in Groot2."))),
+  ];
+}
+function ifaceSelect(n) {
+  const kind = IFACE_KIND[n.pattern]; const items = specItems(kind);
+  const opts = [["", items.length ? "— choose an interface from the spec —" : `— no ${kind} in the spec —`]].concat(items.map(it => [it.id, `${strip(it.name)}  ·  ${strip(it.ros) || "—"}`]));
+  return labeled("Interface from the spec", selectEl(`ni-${n.id}`, opts, n.iface, v => { applyIface(n, itemById(v)); renderAll(); }, "width:100%"), "full");
+}
+function inRows(n, key, title) {
+  const rows = n[key];
+  const box = h("div", { class: "nrows" }, h("div", { class: "nrow head" }, h("span"), h("span", null, "Field"), h("span", null, "ROS type"), h("span", null, "Source"), h("span", null, "Default / value"), h("span")));
+  rows.forEach((r, i) => {
+    const mode = selectEl(`nm-${r.id}`, [["port", "Input port"], ["const", "Constant"], ["now", "Current time"], ["counter", "Counter"]], r.mode, v => { r.mode = v; if (v === "port" && !r.value) r.value = `{${r.field}}`; renderAll(); });
+    const val = r.mode === "now" || r.mode === "counter" ? h("span", { class: "hint" }, r.mode === "now" ? "current ROS time" : "+1 per tick") : bound(r, "value", { mono: true, ph: r.mode === "port" ? "{key} or default" : "value or CONSTANT" });
+    box.append(h("div", { class: "nrow" }, rowCheck(r), bound(r, "field", { mono: true, ph: "field" }), bound(r, "type", { mono: true, list: "types", ph: "float32" }), mode, val,
+      armedBtn("icon del", ICON.del, "Remove (click twice)", () => { rows.splice(i, 1); renderAll(); })));
+  });
+  box.append(h("div", null, h("button", { class: "btn ghost small", onclick: () => { rows.push({ id: uid(), on: true, field: "", type: "float32", mode: "port", value: "" }); renderAll(); } }, "+ Field")));
+  return h("div", { class: "card" }, h("h3", null, title), box,
+    h("p", { class: "hint", style: "margin:8px 0 0" }, "Input port: value comes from the tree XML or the blackboard ({key}). Constant: fixed in the code; an UPPER_CASE name refers to a constant of the message."));
+}
+function outRows(n, key, title, hint, bare) {
+  const rows = n[key];
+  const box = h("div", { class: "nrows" }, h("div", { class: "nrow out head" }, h("span"), h("span", null, "Field"), h("span", null, "ROS type"), h("span", null, "→ Blackboard key"), h("span")));
+  rows.forEach((r, i) => box.append(h("div", { class: "nrow out" }, rowCheck(r), bound(r, "field", { mono: true, ph: "field" }), bound(r, "type", { mono: true, list: "types", ph: "float32" }), bound(r, "key", { mono: true, ph: "blackboard_key" }),
+    armedBtn("icon del", ICON.del, "Remove (click twice)", () => { rows.splice(i, 1); renderAll(); }))));
+  box.append(h("div", null, h("button", { class: "btn ghost small", onclick: () => { rows.push({ id: uid(), on: true, field: "", type: "float32", key: "" }); renderAll(); } }, "+ Field")));
+  if (bare) return box;
+  return h("div", { class: "card" }, h("h3", null, title), box, hint ? h("p", { class: "hint", style: "margin:8px 0 0" }, hint) : null);
+}
+function rowCheck(r) { const cb = h("input", { type: "checkbox", title: "Use this field" }); cb.checked = r.on !== false; cb.addEventListener("change", () => { r.on = cb.checked; changed(); }); return cb; }
+function keyInput(n, onKnown) {
+  const e = bound(n, "key", { mono: true, list: "bb-list", ph: "battery_remaining_pct" });
+  e.addEventListener("change", () => { const t = bbKeys().get(n.key); if (t && onKnown) onKnown(t); renderAll(); });
+  return e;
+}
+function missingSel(n, label) { return labeled(label || "If the key is not on the blackboard", selectEl(`nmiss-${n.id}`, MISSING, n.missing, v => { n.missing = v; renderAll(); }, "width:100%")); }
+function nodeEditor(n) {
+  const N = NS(); const idx = N.list.indexOf(n); const g = genNode(n);
+  const head = h("div", { class: "ed-head" },
+    h("div", null, h("div", { class: "crumb" }, `BT node · ${PAT[n.pattern].label} · ${g.kind}`), h("h2", null, g.cls)),
+    h("div", { class: "actions" },
+      h("button", { class: "icon", title: "Move up", html: ICON.up, onclick: () => move(N.list, idx, -1) }),
+      h("button", { class: "icon", title: "Move down", html: ICON.down, onclick: () => move(N.list, idx, 1) }),
+      h("button", { class: "btn", onclick: () => { const c = JSON.parse(JSON.stringify(n)); c.id = uid(); c.name = uniqueName(camel(n.name) + "Copy"); ["rows", "goal", "fb", "res", "ports"].forEach(k => (c[k] || []).forEach(r => r.id = uid())); N.list.splice(idx + 1, 0, c); select({ type: "node", nid: c.id }); } }, "Duplicate"),
+      armedBtn("btn danger", "Delete", "Delete node (click twice)", () => { N.list.splice(idx, 1); select({ type: "nodes" }); }, "Really delete?")));
+  const nameIn = bound(n, "name", { mono: true, ph: "BatteryLow" });
+  const basics = h("div", { class: "card" }, h("h3", null, "Node"),
+    h("div", { class: "grid" }, labeled("Name (C++ class and tree ID)", nameIn), h("div", { class: "f fcol" }, h("span", { class: "hint" }, PAT[n.pattern].desc)),
+      labeled("Description (comment in the code)", bound(n, "desc", { multi: true, rows: 2, ph: "What this node checks or does" }), "full")));
+  const out = [head, basics];
+  const opSeg = (opts, key) => seg(opts, n[key], v => { n[key] = v; renderAll(); });
+  switch (n.pattern) {
+    case "compare": {
+      const thrIn = bound(n, "thr", { mono: true, ph: "30" }); const clrIn = bound(n, "clear", { mono: true, ph: "35" });
+      out.push(h("div", { class: "card" }, h("h3", null, "Check"),
+        h("div", { class: "grid" },
+          labeled("Blackboard key", keyInput(n, t => { if (NUM_TYPES.includes(t)) n.type = t; })),
+          labeled("Type", selectEl(`nt-${n.id}`, NUM_TYPES.map(t => [t, t]), n.type, v => { n.type = v; renderAll(); }, "width:100%")),
+          h("div", { class: "f fcol full" }, h("span", null, "SUCCESS while the value is …"), opSeg(OPS, "op")),
+          h("div", { class: "f fcol full" }, h("span", null, "Threshold"), seg([["port", "Input port (change in XML / Groot2)"], ["const", "Constant in the code"]], n.thrMode, v => { n.thrMode = v; renderAll(); })),
+          labeled(n.thrMode === "port" ? "Default threshold" : "Threshold", thrIn),
+          hystOk(n) ? h("div", { class: "f fcol" }, h("span", null, "Hysteresis"), checkbox(n, "hyst", "Clear at a different value", renderAll)) : h("div"),
+          n.hyst && hystOk(n) ? labeled(`Clear value (stays active while value ${n.op.startsWith("<") ? "<" : ">"} this)`, clrIn) : null,
+          missingSel(n))));
+      break;
+    }
+    case "flag":
+      out.push(h("div", { class: "card" }, h("h3", null, "Check"),
+        h("div", { class: "grid" }, labeled("Blackboard key (bool)", keyInput(n)),
+          h("div", { class: "f fcol" }, h("span", null, "SUCCESS if the flag is …"), opSeg([["true", "true"], ["false", "false"]], "equals")),
+          missingSel(n))));
+      break;
+    case "enum": {
+      const e = enumByRef(n.enumRef);
+      const enums = allEnums();
+      const valBox = h("div", { class: "opts" });
+      if (e) e.en.rows.forEach(r => {
+        const nm = strip(r.name).trim(); const id = `ev-${n.id}-${nm}`;
+        const cb = h("input", { type: "checkbox", id }); cb.checked = n.values.includes(nm);
+        cb.addEventListener("change", () => { n.values = cb.checked ? [...n.values, nm] : n.values.filter(v => v !== nm); renderAll(); });
+        valBox.append(h("label", { class: "check", for: id }, cb, h("span", { class: "mono" }, `${nm} = ${strip(r.value)}`)));
+      });
+      out.push(h("div", { class: "card" }, h("h3", null, "Check"),
+        h("div", { class: "grid" },
+          labeled("Blackboard key", keyInput(n, t => { if (NUM_TYPES.includes(t)) n.type = t; })),
+          labeled("Type", selectEl(`nt-${n.id}`, NUM_TYPES.map(t => [t, t]), n.type, v => { n.type = v; renderAll(); }, "width:100%")),
+          labeled("Constants from the spec", selectEl(`ne-${n.id}`, [["", enums.length ? "— choose an enum —" : "— no enums in the spec —"]].concat(enums.map(x => [x.ref, `${strip(x.it.name)} · ${strip(x.en.title)}`])), n.enumRef, v => { n.enumRef = v; n.values = []; renderAll(); }, "width:100%"), "full"),
+          e ? h("div", { class: "f full" }, valBox) : null,
+          labeled("Additional values (optional)", bound(n, "manual", { mono: true, ph: "STATE_ACTIVE=1, 4" }), "full"),
+          h("div", { class: "f fcol full" }, h("span", null, "SUCCESS if the value …"), opSeg([["in", "is one of"], ["not_in", "is none of"], ["ge", "is at least"], ["le", "is at most"]], "op")),
+          missingSel(n))));
+      break;
+    }
+    case "action":
+      out.push(h("div", { class: "card" }, h("h3", null, "Action"),
+        h("div", { class: "grid" }, ifaceSelect(n),
+          labeled("Action type", bound(n, "type", { mono: true, ph: "my_interfaces/action/Land" })),
+          labeled("Action name (default)", bound(n, "server", { mono: true, ph: "fci/land" })))));
+      out.push(inRows(n, "goal", "Goal"), outRows(n, "fb", "Feedback → blackboard", "Written on every feedback message while the goal is running."),
+        outRows(n, "res", "Result → blackboard", "SUCCESS if the goal succeeded and result.success is true (when the result has a success field)."));
+      break;
+    case "service":
+      out.push(h("div", { class: "card" }, h("h3", null, "Service"),
+        h("div", { class: "grid" }, ifaceSelect(n),
+          labeled("Service type", bound(n, "type", { mono: true, ph: "my_interfaces/srv/LoadMission" })),
+          labeled("Service name (default)", bound(n, "server", { mono: true, ph: "mission/load" })))));
+      out.push(inRows(n, "goal", "Request"), outRows(n, "res", "Response → blackboard", "SUCCESS if response.success is true (when the response has a success field)."));
+      break;
+    case "publish":
+      out.push(h("div", { class: "card" }, h("h3", null, "Topic"),
+        h("div", { class: "grid" }, ifaceSelect(n),
+          labeled("Message type", bound(n, "type", { mono: true, ph: "my_interfaces/msg/Heartbeat" })),
+          labeled("Topic name (default)", bound(n, "topic", { mono: true, ph: "mission/heartbeat" })))));
+      out.push(inRows(n, "goal", "Message fields"));
+      break;
+    case "custom": {
+      const box = h("div", { class: "nrows" }, h("div", { class: "nrow custom head" }, h("span", null, "Dir"), h("span", null, "Port"), h("span", null, "C++ type"), h("span", null, "Default"), h("span", null, "Description"), h("span")));
+      n.ports.forEach((p, i) => box.append(h("div", { class: "nrow custom" },
+        selectEl(`np-${p.id}`, [["in", "in"], ["out", "out"]], p.dir, v => { p.dir = v; renderAll(); }),
+        bound(p, "name", { mono: true, ph: "port_name" }), bound(p, "type", { mono: true, list: "cpp-types", ph: "double" }),
+        bound(p, "def", { mono: true, ph: "{key} or value" }), bound(p, "desc", { ph: "Description" }),
+        armedBtn("icon del", ICON.del, "Remove (click twice)", () => { n.ports.splice(i, 1); renderAll(); }))));
+      box.append(h("div", null, h("button", { class: "btn ghost small", onclick: () => { n.ports.push({ id: uid(), dir: "in", name: "", type: "double", def: "", desc: "" }); renderAll(); } }, "+ Port")));
+      out.push(h("div", { class: "card" }, h("h3", null, "Node type"),
+        seg([["Condition", "Condition"], ["SyncAction", "Sync action"], ["StatefulAction", "Stateful action (runs over several ticks)"]], n.base, v => { n.base = v; renderAll(); })),
+        h("div", { class: "card" }, h("h3", null, "Ports"), box));
+      break;
+    }
+  }
+  return out;
+}
+
+/* --- Snapshot: input topics → blackboard, written by the runner before every tick --- */
+function snapSlugs() {
+  const used = new Map();
+  return NS().snapshot.map((e, i) => { const b = snake(strip(e.topic).trim() || "topic_" + (i + 1)); const n = used.get(b) || 0; used.set(b, n + 1); return n ? `${b}_${n + 1}` : b; });
+}
+function newSnapEntry(it, topic) {
+  const ros = it ? strip(it.ros).trim() : (topic || "");
+  const e = { id: uid(), iface: it ? it.id : "", type: "", topic: ros, ageKey: ros ? snake(ros) + "_age_s" : "", rows: [] };
+  if (it) {
+    e.type = `${NS().ifacePkg || "my_interfaces"}/msg/${camel(lastSeg(it.ros) || it.name)}`;
+    const taken = bbKeys(); const first = snake(ros.split("/").filter(Boolean)[0] || "");
+    e.rows = fieldsOf(it, "Message").map(f => outRow(f, taken.has(f.field) && first ? first : ""));
+  }
+  return e;
+}
+function ensureSnapTopic(ros) {
+  const N = NS(); let e = N.snapshot.find(x => strip(x.topic).trim() === ros); if (e) return e;
+  const it = specItems("topic").find(t => strip(t.ros).trim() === ros);
+  e = newSnapEntry(it, ros); e.rows.forEach(r => r.on = false); N.snapshot.push(e); return e;
+}
+function ensureSignal(sig) {
+  if (bbKeys().has(sig)) return;
+  const it = specItems("topic").find(t => fieldsOf(t, "Message").some(f => f.field === sig));
+  if (it) { const e = ensureSnapTopic(strip(it.ros).trim()); const r = e.rows.find(r => r.field === sig); if (r) { r.on = true; r.key = sig; } return; }
+  NS().derived.push({ id: uid(), key: sig, type: "double", expr: "" });
+}
+function snapshotCode() {
+  const N = NS(); const ns = ident(N.ns || N.pkg); const slugs = snapSlugs();
+  const T = N.snapshot.map(e => rosIface(e.type, "msg") || { cpp: "TODO_pkg::msg::TODO_Type", inc: "TODO_pkg/msg/todo_type.hpp" });
+  const incs = [...new Set(T.map(t => t.inc))].map(x => `#include <${x}>`).join("\n");
+  const D = N.derived.filter(d => d.key);
+  let s = `// Generated by Interface Spec Builder.
+#pragma once
+
+#include <limits>
+#include <memory>
+#include <optional>
+#include <string>
+
+#include <behaviortree_cpp/blackboard.h>
+#include <rclcpp/rclcpp.hpp>
+${incs ? "\n" + incs + "\n" : ""}
+namespace ${ns}
+{
+
+/// Keeps the latest message of every input topic and writes one consistent
+/// snapshot to the blackboard right before each tick.
+/// The callbacks only store messages. The blackboard is written in write(),
+/// which the runner calls in the same thread as tickOnce().
+class Snapshot
+{
+public:
+  explicit Snapshot(const rclcpp::Node::SharedPtr& node)
+  : node_(node)
+  {
+`;
+  if (N.snapshot.length) s += `    // Best effort connects to reliable and best-effort publishers alike
+    const auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).best_effort();
+`;
+  N.snapshot.forEach((e, i) => {
+    const m = slugs[i]; const t = T[i];
+    s += `
+    ${m}_sub_ = node->create_subscription<${t.cpp}>(
+      node->declare_parameter<std::string>(${cq("topics." + m)}, ${cq(strip(e.topic).trim())}), qos,
+      [this](${t.cpp}::SharedPtr msg) {
+        ${m}_ = msg;
+        ${m}_rx_ = node_->now();
+      });
+`;
+  });
+  s += `  }
+
+  void write(const BT::Blackboard::Ptr& bb)
+  {
+`;
+  if (N.snapshot.some(e => e.ageKey)) s += "    const rclcpp::Time now = node_->now();\n";
+  if (!N.snapshot.length && !D.length) s += "    (void)bb;\n";
+  N.snapshot.forEach((e, i) => {
+    const m = slugs[i]; const rows = e.rows.filter(r => r.on && r.field && r.key);
+    s += `\n    // ${strip(e.topic).trim() || "topic"}\n`;
+    if (rows.length) s += `    if (${m}_) {\n` + rows.map(r => `      bb->set(${cq(r.key)}, ${m}_->${r.field});\n`).join("") + "    }\n";
+    if (e.ageKey) s += `    bb->set(${cq(e.ageKey)}, age(${m}_ != nullptr, ${m}_rx_, now));\n`;
+  });
+  if (D.length) {
+    s += "\n    // Derived values: only written when the function returns a value\n";
+    D.forEach(d => s += `    if (const auto v = derive${camel(d.key)}()) {\n      bb->set(${cq(d.key)}, *v);\n    }\n`);
+  }
+  s += `  }
+
+private:
+  /// Seconds since the last message, infinity before the first one
+  static double age(bool received, const rclcpp::Time& rx, const rclcpp::Time& now)
+  {
+    return received ? (now - rx).seconds() : std::numeric_limits<double>::infinity();
+  }
+`;
+  D.forEach(d => {
+    const ty = strip(d.type).trim() || "double"; const ex = strip(d.expr).trim();
+    s += `\n  std::optional<${ty}> derive${camel(d.key)}() const\n  {\n`;
+    s += ex ? `    return ${ex};\n` : `    // TODO: compute ${d.key} from the latest messages${N.snapshot.length ? `, e.g. ${slugs[0]}_->...` : ""}\n    //       Return std::nullopt while the inputs are missing.\n    return std::nullopt;\n`;
+    s += "  }\n";
+  });
+  s += "\n  rclcpp::Node::SharedPtr node_;\n";
+  N.snapshot.forEach((e, i) => { const m = slugs[i]; const t = T[i]; s += `  ${t.cpp}::SharedPtr ${m}_;\n  rclcpp::Time ${m}_rx_;\n  rclcpp::Subscription<${t.cpp}>::SharedPtr ${m}_sub_;\n`; });
+  return s + `};\n\n}  // namespace ${ns}\n`;
+}
+function snapshotEditor() {
+  const N = NS(); const topics = specItems("topic");
+  const topicOpts = first => [["", first]].concat(topics.map(it => [it.id, `${strip(it.name)}  ·  ${strip(it.ros) || "—"}`]));
+  const out = [h("div", { class: "ed-head" }, h("div", null, h("div", { class: "crumb" }, "BT nodes · inputs"), h("h2", null, "Snapshot")),
+      h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: downloadPackage }, "Download package (ZIP)"))),
+    h("div", { class: "card" }, h("h3", null, "How it works"),
+      h("ol", { class: "rules" },
+        h("li", null, "The ROS node subscribes to every topic below. The callbacks only keep the latest message and its receive time."),
+        h("li", null, "Right before every tick, the runner writes the checked fields to the blackboard, plus the age of each topic in seconds."),
+        h("li", null, "The age is infinity until the first message arrives, so a timeout is just “age > limit” with the Compare pattern."),
+        h("li", null, "Derived values (e.g. an energy margin) are computed in one place and written next to the raw values.")))];
+  N.snapshot.forEach((e, i) => {
+    const ifs = selectEl(`si-${e.id}`, topicOpts(topics.length ? "— choose a topic from the spec —" : "— no topics in the spec —"), e.iface, v => {
+      const it = itemById(v); if (!it) { e.iface = ""; renderAll(); return; }
+      Object.assign(e, newSnapEntry(it), { id: e.id }); renderAll(); }, "width:100%");
+    out.push(h("div", { class: "card" },
+      h("h3", null, h("span", { class: "mono", style: "text-transform:none;letter-spacing:0;font-size:13px;color:var(--fg)" }, strip(e.topic).trim() || "New topic"), h("span", { class: "sp" }),
+        h("button", { class: "icon", title: "Move up", html: ICON.up, onclick: () => move(N.snapshot, i, -1) }),
+        h("button", { class: "icon", title: "Move down", html: ICON.down, onclick: () => move(N.snapshot, i, 1) }),
+        armedBtn("icon del", ICON.del, "Remove topic (click twice)", () => { N.snapshot.splice(i, 1); renderAll(); })),
+      h("div", { class: "grid", style: "margin-bottom:12px" },
+        labeled("Interface from the spec", ifs, "full"),
+        labeled("Message type", bound(e, "type", { mono: true, ph: "my_interfaces/msg/VehicleStatus" })),
+        labeled("Topic name (default, parameter topics.…)", bound(e, "topic", { mono: true, ph: "fci/vehicle_status" })),
+        labeled("Age key (seconds since the last message)", bound(e, "ageKey", { mono: true, ph: "fci_vehicle_status_age_s" }))),
+      outRows(e, "rows", "", "", true)));
+  });
+  const free = topics.filter(it => !N.snapshot.some(e => e.iface === it.id));
+  const add = selectEl("snap-add", [["", free.length ? "+ Add topic from the spec …" : "All spec topics added"]].concat(free.map(it => [it.id, `${strip(it.name)}  ·  ${strip(it.ros) || "—"}`])), "",
+    v => { const it = itemById(v); if (it) { N.snapshot.push(newSnapEntry(it)); renderAll(); } }, "width:auto;max-width:100%");
+  out.push(h("div", { class: "danger-zone", style: "margin-bottom:14px" }, add,
+    h("button", { class: "btn ghost small", onclick: () => { N.snapshot.push(newSnapEntry(null, "")); renderAll(); } }, "+ Empty topic")));
+  const dbox = h("div", { class: "nrows" }, h("div", { class: "nrow out head" }, h("span"), h("span", null, "Blackboard key"), h("span", null, "C++ type"), h("span", null, "Expression (optional)"), h("span")));
+  N.derived.forEach((d, i) => dbox.append(h("div", { class: "nrow out" }, h("span"), bound(d, "key", { mono: true, ph: "return_energy_margin_pct" }), bound(d, "type", { mono: true, list: "cpp-types", ph: "double" }),
+    bound(d, "expr", { mono: true, ph: "empty = TODO in the code" }), armedBtn("icon del", ICON.del, "Remove (click twice)", () => { N.derived.splice(i, 1); renderAll(); }))));
+  dbox.append(h("div", null, h("button", { class: "btn ghost small", onclick: () => { N.derived.push({ id: uid(), key: "", type: "double", expr: "" }); renderAll(); } }, "+ Derived value")));
+  out.push(h("div", { class: "card" }, h("h3", null, "Derived values"), dbox,
+    h("p", { class: "hint", style: "margin:8px 0 0" }, "Each value gets its own function in snapshot.hpp that returns std::optional. Until you implement it, it returns std::nullopt and the key stays missing instead of holding a wrong value.")));
+  return out;
+}
+
+/* --- Code preview --- */
+function hl(code, lang) {
+  const KW = "class|public|private|protected|return|if|else|const|auto|static|constexpr|bool|double|float|int|void|override|namespace|inline|struct|using|template|typename|true|false|nullptr|while|for|throw|uint8_t|uint64_t|int8_t|int16_t|uint16_t|int32_t|uint32_t|int64_t";
+  const re = lang === "xml" ? /(<!--[\s\S]*?-->)|("[^"]*")|(<\/?[\w:.-]+|\/?>|<\?[\w-]+|\?>)|(\{[\w.]*\})/g
+    : lang === "cpp" ? new RegExp(`(\\/\\/[^\\n]*|^#[^\\n]*)|("(?:[^"\\\\\\n]|\\\\.)*")|\\b(${KW})\\b|\\b(\\d+(?:\\.\\d+)?f?)\\b`, "gm")
+    : /(#[^\n]*)|("(?:[^"\\\n]|\\.)*")|\b(find_package|add_executable|install|project|ament_package|ament_target_dependencies|target_include_directories|set|if|endif|cmake_minimum_required|ros__parameters)\b|\b(\d+(?:\.\d+)?)\b/g;
+  let out = "", last = 0, m;
+  while ((m = re.exec(code))) {
+    out += esc(code.slice(last, m.index));
+    const cls = m[1] ? "c" : m[2] ? "s" : m[3] ? "k" : "n";
+    out += `<span class="tok-${cls}">${esc(m[0])}</span>`; last = m.index + m[0].length;
+    if (m[0] === "") re.lastIndex++;
+  }
+  return out + esc(code.slice(last));
+}
+function renderCodePreview(pv) {
+  const N = NS(); let list, cap;
+  if (sel.type === "snapshot") {
+    cap = "Snapshot"; list = [{ name: `include/${N.pkg}/snapshot.hpp`, lang: "cpp", text: snapshotCode() }, { name: "src/bt_runner.cpp", lang: "cpp", text: runnerCode() }];
+  } else if (sel.type === "node") {
+    const n = N.list.find(x => x.id === sel.nid); const g = genNode(n); cap = g.cls;
+    list = [{ name: g.file, lang: "cpp", text: g.hpp, short: snake(g.cls) + ".hpp" },
+      { name: "Groot2 model", lang: "xml", text: modelXml([g]).replace(/^ {2}/gm, "") },
+      { name: "Registration", lang: "cpp", text: registerOne(n, g, Number(N.serverTimeoutMs) || 1000).replace(/^ {2}/gm, "") }];
+  } else { list = packageFiles(); cap = N.pkg; }
+  const f = list.find(x => x.name === codeFile) || list[0]; codeFile = f.name;
+  pv.textContent = "";
+  pv.append(h("div", { class: "pv-caption" }, h("span", null, "Code · " + cap), h("span", { class: "pill" }, "Jazzy · BT.CPP v4")),
+    h("div", { class: "files" }, list.map(x => h("button", { type: "button", "aria-pressed": String(x === f), title: x.name, onclick: () => { codeFile = x.name; renderPreview(); } }, x.short || x.name.split("/").pop()))),
+    h("div", { class: "code-bar" }, h("span", { class: "mono hint" }, f.name), h("button", { class: "btn small", onclick: () => copy(f.text) }, "Copy")),
+    h("pre", { class: "code code-view", html: hl(f.text, f.lang) }));
+}
+
 /* ---------- View tabs ---------- */
 function setView(v) { $("#app").dataset.view = v; $("#tabEdit").setAttribute("aria-pressed", String(v === "edit")); $("#tabPrev").setAttribute("aria-pressed", String(v === "preview")); }
 $("#tabEdit").addEventListener("click", () => setView("edit"));
 $("#tabPrev").addEventListener("click", () => setView("preview"));
 
 /* ---------- Boot ---------- */
-document.body.append(h("datalist", { id: "types" }, TYPES.map(t => h("option", { value: t }))));
+document.body.append(h("datalist", { id: "types" }, TYPES.map(t => h("option", { value: t }))), h("datalist", { id: "bb-list" }), h("datalist", { id: "cpp-types" }, CPP_TYPES.map(t => h("option", { value: t }))));
 state = normalize(load());
 const g0 = state.groups[0];
 sel = g0 && g0.items[0] ? { type: "item", gid: g0.id, iid: g0.items[0].id } : { type: "doc" };
