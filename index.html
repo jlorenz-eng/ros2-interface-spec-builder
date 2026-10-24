@@ -671,7 +671,7 @@ function importPartsCard() {
   file.addEventListener("change", async () => {
     const f = file.files[0]; file.value = ""; if (!f) return;
     try { const s = JSON.parse(await f.text()); if (!valid(s)) throw new Error("not a project");
-      pendingImport = { name: f.name, data: normalize(s), groups: true, points: true, safety: false, nodes: false }; renderEditor(); }
+      pendingImport = { name: f.name, data: normalize(s), groups: true, groupsMode: "append", points: true, safety: false, nodes: false }; renderEditor(); }
     catch (err) { toast("This file is not a valid project (expected JSON from this tool)."); }
   });
   const card = h("div", { class: "card" }, h("h3", null, "Import into this project"),
@@ -681,7 +681,10 @@ function importPartsCard() {
   const opt = (key, text) => checkbox(pendingImport, key, text, renderEditor);
   card.append(h("p", { style: "margin:0 0 8px" }, h("b", null, pendingImport.name)),
     h("div", { class: "opts" },
-      opt("groups", `Interface sections (${d.groups.length}) – added`),
+      opt("groups", `Interface sections (${d.groups.length})`),
+      pendingImport.groups ? h("div", { style: "grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding-left:24px" },
+        seg([["append", "Add to the current interfaces"], ["replace", "Replace the current interfaces"]], pendingImport.groupsMode, v => { pendingImport.groupsMode = v; renderEditor(); }),
+        pendingImport.groupsMode === "replace" ? h("span", { class: "hint" }, `Removes the ${state.groups.length} current section(s) with ${state.groups.reduce((n, g) => n + g.items.length, 0)} interface(s).`) : null) : null,
       opt("points", `Open points (${nPts}) – added, IDs kept unique`),
       opt("safety", `Safety concept (${d.safety.hazards.length} hazards) – replaces the current one`),
       opt("nodes", `BT nodes (${d.nodes.list.length}) – added`)),
@@ -693,8 +696,9 @@ function importPartsCard() {
 function mergeImport(pi) {
   const d = pi.data; const msg = [];
   if (pi.groups) {
+    if (pi.groupsMode === "replace") state.groups = [];
     d.groups.forEach(g => { g.id = uid(); g.items.forEach(it => { it.id = uid(); Object.values(it.fields).forEach(a => a.forEach(f => f.id = uid())); it.enums.forEach(en => { en.id = uid(); en.rows.forEach(r => r.id = uid()); }); }); state.groups.push(g); });
-    msg.push(`${d.groups.length} section(s)`);
+    msg.push(`${d.groups.length} section(s)` + (pi.groupsMode === "replace" ? " (replacing the old ones)" : ""));
   }
   if (pi.points) {
     const used = new Set(allPoints().map(p => p.code)); let n = 0, renamed = 0;
